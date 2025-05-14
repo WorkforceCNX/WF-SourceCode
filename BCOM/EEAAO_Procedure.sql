@@ -1,8 +1,8 @@
-﻿CREATE PROCEDURE BCOM.Refresh_EEAAO_Data
+﻿CREATE OR ALTER PROCEDURE BCOM.Refresh_EEAAO_Data
 AS
 BEGIN
     SET NOCOUNT ON;
-    TRUNCATE TABLE BCOM.EEAAO;
+    TRUNCATE TABLE BCOM.EEAAO; --Clear EEAAO
 /*                                                           
 ----------------------------------------------------------------------------------------------------------------------------------
 --                                       |                                       |                                              --
@@ -1296,8 +1296,14 @@ BEGIN
 	/*252 - Target*/ EEAAO_RAW.[CSAT Reso tar]
 	FROM EEAAO_RAW
 	)
-    -- SAU KHI KHAI BÁO XONG TẤT CẢ CTEs, MỚI ĐẾN CÂU LỆNH INSERT
-    INSERT INTO BCOM.EEAAO (
+/*                                                           
+----------------------------------------------------------------------------------------------------------------------------------
+--                                           ^                             ^                                                    --
+--                                           |        IMPORT CODE HERE     |                                                    --
+--                                           |                             |                                                    --
+----------------------------------------------------------------------------------------------------------------------------------
+*/
+    INSERT INTO BCOM.EEAAO (  -- Insert data to BCOM.EEAAO
         [YEAR], [MONTH], [Date], [Week_num], [Week_day], [DPE_ID], [DPE_Name], [OM_ID], [OM_Name], 
 		[TL_ID], [TL_Name], [Emp ID], [Emp_Name], [Wave], [Booking Login ID], [TED Name], [cnx_email], 
 		[Booking Email], [CUIC Name], [PST_Start_Date], [Termination/Transfer], [Tenure], [Tenure days], 
@@ -1348,7 +1354,7 @@ BEGIN
 		[Hold (phone) tar], [AACW (phone) tar], [Avg Talk Time tar], [Phone CSAT tar], [Non phone CSAT tar], [Overall CSAT tar], 
 		[PSAT tar], [PSAT Vietnamese tar], [PSAT English (American) tar], [PSAT English (Great Britain) tar], [CSAT Reso tar]
     )
-    SELECT  -- Lấy dữ liệu từ CTE cuối cùng (EEAAO_RAW2)
+    SELECT  -- Get Data from final CTE (EEAAO_RAW2)
         [YEAR], [MONTH], [Date], [Week_num], [Week_day], [DPE_ID], [DPE_Name], [OM_ID], [OM_Name], 
 		[TL_ID], [TL_Name], [Emp ID], [Emp_Name], [Wave], [Booking Login ID], [TED Name], [cnx_email], 
 		[Booking Email], [CUIC Name], [PST_Start_Date], [Termination/Transfer], [Tenure], [Tenure days], 
@@ -1399,13 +1405,8 @@ BEGIN
 		[Hold (phone) tar], [AACW (phone) tar], [Avg Talk Time tar], [Phone CSAT tar], [Non phone CSAT tar], [Overall CSAT tar], 
 		[PSAT tar], [PSAT Vietnamese tar], [PSAT English (American) tar], [PSAT English (Great Britain) tar], [CSAT Reso tar]
     FROM EEAAO_RAW2; 
-/*                                                           
-----------------------------------------------------------------------------------------------------------------------------------
---                                           ^                             ^                                                    --
---                                           |        IMPORT CODE HERE     |                                                    --
---                                           |                             |                                                    --
-----------------------------------------------------------------------------------------------------------------------------------
-*/
+	--Overview Sample Data
+	SELECT TOP 5 * FROM BCOM.EEAAO ORDER BY [Emp ID], [Date] DESC;
     SET NOCOUNT OFF;
 END;
 GO
