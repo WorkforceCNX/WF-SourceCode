@@ -217,7 +217,7 @@ MONTH(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RE
 DATENAME(weekday, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) AS [Week_day],
 COALESCE(TRANSFER_RAW.[Remarks], TERMINATION_RAW.[Termination Reason], RESIGNATION_RAW.[Resignation Primary Reason]) AS [Termination/Transfer],
 CASE 
-    WHEN ROSTER_RAW2.[LOB] IN ('NL', 'ID4', 'HE4', 'XT4', 'EL', 'TR', 'KO', 'IT', 'CS', 'HU', 'FR', 'ZH', 'RU', 'PL', 'PT', 'NO', 'DA', 'DE', 'RO') THEN 'Unbabel'
+    WHEN ROSTER_RAW2.[LOB] IN ('NL', 'ID4', 'HE4', 'XT4', 'EL', 'TR', 'KO', 'IT', 'CS', 'HU', 'FR', 'ZH', 'RU', 'PL', 'PT', 'NO', 'DA', 'DE', 'RO', 'BG', 'VI TRA') THEN 'Unbabel'
     WHEN ROSTER_RAW2.[LOB] = 'EN' THEN 'English'
     WHEN ROSTER_RAW2.[LOB] = 'VICSP' THEN 'Vietnamese CSP'
     WHEN ROSTER_RAW2.[LOB] = 'VICSG' THEN 'Vietnamese CSG'
@@ -551,6 +551,8 @@ THEN (CASE WHEN ROSTER_RAW.[LOB] = 'NL' AND CSAT_CMB_RAW.[Language] = 'Dutch' TH
            WHEN ROSTER_RAW.[LOB] = 'ID4' AND CSAT_CMB_RAW.[Language] = 'Indonesian' THEN 1
            WHEN ROSTER_RAW.[LOB] = 'RU' AND CSAT_CMB_RAW.[Language] = 'Russian' THEN 1
            WHEN ROSTER_RAW.[LOB] = 'EL' AND CSAT_CMB_RAW.[Language] = 'Greek' THEN 1
+		   WHEN ROSTER_RAW.[LOB] = 'BG' AND CSAT_CMB_RAW.[Language] = 'Bulgarian' THEN 1
+		   WHEN ROSTER_RAW.[LOB] = 'VI TRA' AND CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1
            ELSE 0 
       END) 
 ELSE 0 END) AS [Csat Score(UB)],
@@ -575,6 +577,8 @@ THEN (CASE WHEN ROSTER_RAW.[LOB] = 'NL' AND CSAT_CMB_RAW.[Language] = 'Dutch' TH
            WHEN ROSTER_RAW.[LOB] = 'ID4' AND CSAT_CMB_RAW.[Language] = 'Indonesian' THEN 1
            WHEN ROSTER_RAW.[LOB] = 'RU' AND CSAT_CMB_RAW.[Language] = 'Russian' THEN 1
            WHEN ROSTER_RAW.[LOB] = 'EL' AND CSAT_CMB_RAW.[Language] = 'Greek' THEN 1
+		   WHEN ROSTER_RAW.[LOB] = 'BG' AND CSAT_CMB_RAW.[Language] = 'Bulgarian' THEN 1
+		   WHEN ROSTER_RAW.[LOB] = 'VI TRA' AND CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1
            ELSE 0 
       END) 
 ELSE 0 END) AS [Csat Survey(UB)],
