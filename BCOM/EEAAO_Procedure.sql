@@ -1,8 +1,8 @@
-﻿CREATE PROCEDURE BCOM.Refresh_EEAAO_Data
+﻿CREATE OR ALTER PROCEDURE BCOM.Refresh_EEAAO_Data
 AS
 BEGIN
     SET NOCOUNT ON;
-    TRUNCATE TABLE BCOM.EEAAO;
+    TRUNCATE TABLE BCOM.EEAAO; --Clear EEAAO
 /*                                                           
 ----------------------------------------------------------------------------------------------------------------------------------
 --                                       |                                       |                                              --
@@ -229,7 +229,7 @@ BEGIN
 	DATENAME(weekday, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) AS [Week_day],
 	COALESCE(TRANSFER_RAW.[Remarks], TERMINATION_RAW.[Termination Reason], RESIGNATION_RAW.[Resignation Primary Reason]) AS [Termination/Transfer],
 	CASE 
-		WHEN ROSTER_RAW2.[LOB] IN ('NL', 'ID4', 'HE4', 'XT4', 'EL', 'TR', 'KO', 'IT', 'CS', 'HU', 'FR', 'ZH', 'RU', 'PL', 'PT', 'NO', 'DA', 'DE', 'RO') THEN 'Unbabel'
+		WHEN ROSTER_RAW2.[LOB] IN ('NL', 'ID4', 'HE4', 'XT4', 'EL', 'TR', 'KO', 'IT', 'CS', 'HU', 'FR', 'ZH', 'RU', 'PL', 'PT', 'NO', 'DA', 'DE', 'RO', 'BG', 'VI TRA') THEN 'Unbabel'
 		WHEN ROSTER_RAW2.[LOB] = 'EN' THEN 'English'
 		WHEN ROSTER_RAW2.[LOB] = 'VICSP' THEN 'Vietnamese CSP'
 		WHEN ROSTER_RAW2.[LOB] = 'VICSG' THEN 'Vietnamese CSG'
@@ -563,6 +563,8 @@ BEGIN
 			   WHEN ROSTER_RAW.[LOB] = 'ID4' AND CSAT_CMB_RAW.[Language] = 'Indonesian' THEN 1
 			   WHEN ROSTER_RAW.[LOB] = 'RU' AND CSAT_CMB_RAW.[Language] = 'Russian' THEN 1
 			   WHEN ROSTER_RAW.[LOB] = 'EL' AND CSAT_CMB_RAW.[Language] = 'Greek' THEN 1
+			   WHEN ROSTER_RAW.[LOB] = 'BG' AND CSAT_CMB_RAW.[Language] = 'Bulgarian' THEN 1
+			   WHEN ROSTER_RAW.[LOB] = 'VI TRA' AND CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1
 			   ELSE 0 
 		  END) 
 	ELSE 0 END) AS [Csat Score(UB)],
@@ -587,6 +589,8 @@ BEGIN
 			   WHEN ROSTER_RAW.[LOB] = 'ID4' AND CSAT_CMB_RAW.[Language] = 'Indonesian' THEN 1
 			   WHEN ROSTER_RAW.[LOB] = 'RU' AND CSAT_CMB_RAW.[Language] = 'Russian' THEN 1
 			   WHEN ROSTER_RAW.[LOB] = 'EL' AND CSAT_CMB_RAW.[Language] = 'Greek' THEN 1
+			   WHEN ROSTER_RAW.[LOB] = 'BG' AND CSAT_CMB_RAW.[Language] = 'Bulgarian' THEN 1
+		       WHEN ROSTER_RAW.[LOB] = 'VI TRA' AND CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1
 			   ELSE 0 
 		  END) 
 	ELSE 0 END) AS [Csat Survey(UB)],
@@ -1296,8 +1300,14 @@ BEGIN
 	/*252 - Target*/ EEAAO_RAW.[CSAT Reso tar]
 	FROM EEAAO_RAW
 	)
-    -- SAU KHI KHAI BÁO XONG TẤT CẢ CTEs, MỚI ĐẾN CÂU LỆNH INSERT
-    INSERT INTO BCOM.EEAAO (
+/*                                                           
+----------------------------------------------------------------------------------------------------------------------------------
+--                                           ^                             ^                                                    --
+--                                           |        IMPORT CODE HERE     |                                                    --
+--                                           |                             |                                                    --
+----------------------------------------------------------------------------------------------------------------------------------
+*/
+    INSERT INTO BCOM.EEAAO (  -- Insert data to BCOM.EEAAO
         [YEAR], [MONTH], [Date], [Week_num], [Week_day], [DPE_ID], [DPE_Name], [OM_ID], [OM_Name], 
 		[TL_ID], [TL_Name], [Emp ID], [Emp_Name], [Wave], [Booking Login ID], [TED Name], [cnx_email], 
 		[Booking Email], [CUIC Name], [PST_Start_Date], [Termination/Transfer], [Tenure], [Tenure days], 
@@ -1348,7 +1358,7 @@ BEGIN
 		[Hold (phone) tar], [AACW (phone) tar], [Avg Talk Time tar], [Phone CSAT tar], [Non phone CSAT tar], [Overall CSAT tar], 
 		[PSAT tar], [PSAT Vietnamese tar], [PSAT English (American) tar], [PSAT English (Great Britain) tar], [CSAT Reso tar]
     )
-    SELECT  -- Lấy dữ liệu từ CTE cuối cùng (EEAAO_RAW2)
+    SELECT  -- Get Data from final CTE (EEAAO_RAW2)
         [YEAR], [MONTH], [Date], [Week_num], [Week_day], [DPE_ID], [DPE_Name], [OM_ID], [OM_Name], 
 		[TL_ID], [TL_Name], [Emp ID], [Emp_Name], [Wave], [Booking Login ID], [TED Name], [cnx_email], 
 		[Booking Email], [CUIC Name], [PST_Start_Date], [Termination/Transfer], [Tenure], [Tenure days], 
@@ -1399,13 +1409,8 @@ BEGIN
 		[Hold (phone) tar], [AACW (phone) tar], [Avg Talk Time tar], [Phone CSAT tar], [Non phone CSAT tar], [Overall CSAT tar], 
 		[PSAT tar], [PSAT Vietnamese tar], [PSAT English (American) tar], [PSAT English (Great Britain) tar], [CSAT Reso tar]
     FROM EEAAO_RAW2; 
-/*                                                           
-----------------------------------------------------------------------------------------------------------------------------------
---                                           ^                             ^                                                    --
---                                           |        IMPORT CODE HERE     |                                                    --
---                                           |                             |                                                    --
-----------------------------------------------------------------------------------------------------------------------------------
-*/
+	--Overview Sample Data
+	SELECT TOP 5 * FROM BCOM.EEAAO ORDER BY [Emp ID], [Date] DESC;
     SET NOCOUNT OFF;
 END;
 GO
