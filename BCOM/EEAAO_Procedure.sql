@@ -2,7 +2,10 @@
 AS
 BEGIN
     SET NOCOUNT ON;
+	PRINT 'Starting procedure BCOM.Refresh_EEAAO_Data.';
+    PRINT 'Truncating table BCOM.EEAAO...';
     TRUNCATE TABLE BCOM.EEAAO; --Clear EEAAO
+	PRINT 'Table BCOM.EEAAO truncated successfully. And start run EEAAO scrip';
 /*                                                           
 ----------------------------------------------------------------------------------------------------------------------------------
 --                                       |                                       |                                              --
@@ -1409,8 +1412,11 @@ BEGIN
 		[Hold (phone) tar], [AACW (phone) tar], [Avg Talk Time tar], [Phone CSAT tar], [Non phone CSAT tar], [Overall CSAT tar], 
 		[PSAT tar], [PSAT Vietnamese tar], [PSAT English (American) tar], [PSAT English (Great Britain) tar], [CSAT Reso tar]
     FROM EEAAO_RAW2; 
+    RAISERROR('Data insertion into BCOM.EEAAO completed.', 0, 1) WITH NOWAIT;
+    PRINT 'Fetching top 5 rows from BCOM.EEAAO as sample data...';
 	--Overview Sample Data
 	SELECT TOP 5 * FROM BCOM.EEAAO ORDER BY [Emp ID], [Date] DESC;
+    PRINT 'Procedure BCOM.Refresh_EEAAO_Data completed successfully.';
     SET NOCOUNT OFF;
 END;
 GO
