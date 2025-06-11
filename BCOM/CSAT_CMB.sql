@@ -212,7 +212,8 @@ DATENAME(weekday, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_R
 COALESCE(TRANSFER_RAW.[Remarks], TERMINATION_RAW.[Termination Reason], RESIGNATION_RAW.[Resignation Primary Reason]) AS [Termination/Transfer],
 CASE 
     WHEN ROSTER_RAW2.[LOB] IN ('NL', 'ID4', 'HE4', 'XT4', 'EL', 'TR', 'KO', 'IT', 'CS', 'HU', 'FR', 'ZH', 'RU', 'PL', 'PT', 'NO', 'DA', 'DE', 'RO', 'BG', 'VI TRA') THEN 'Unbabel'
-    WHEN ROSTER_RAW2.[LOB] = 'EN' THEN 'English'
+    WHEN ROSTER_RAW2.[LOB] IN ('FR CSP', 'ES CSP', 'IT CSP', 'DE CSP') THEN 'Unbabel CSP'
+	WHEN ROSTER_RAW2.[LOB] = 'EN' THEN 'English'
     WHEN ROSTER_RAW2.[LOB] = 'VICSP' THEN 'Vietnamese CSP'
     WHEN ROSTER_RAW2.[LOB] = 'VICSG' THEN 'Vietnamese CSG'
     WHEN ROSTER_RAW2.[LOB] = 'Senior VICSP' THEN 'Senior VICSP'
@@ -315,9 +316,9 @@ CASE
 	ELSE CONCAT(YEAR(CSAT_CMB_RAW.[Date]), FORMAT(DATEPART(ISO_WEEK, CSAT_CMB_RAW.[Date]),'00')) END AS [Week_num],
 DATENAME(weekday, CSAT_CMB_RAW.[Date]) AS [Week_day],
 ROSTER_RAW3.[OM_Name], ROSTER_RAW3.[TL_Name], CSAT_CMB_RAW.[Employee_ID], ROSTER_RAW3.[Emp_Name], ROSTER_RAW3.[Wave], 
-ROSTER_RAW3.[Booking Login ID], ROSTER_RAW3.[TED Name], ROSTER_RAW3.[cnx_email], ROSTER_RAW3.[Booking Email], ROSTER_RAW3.[CUIC Name], 
-ROSTER_RAW3.[Tenure days], ROSTER_RAW3.[LOB], CSAT_CMB_RAW.[Survey Id], CSAT_CMB_RAW.[Reservation], 
-CSAT_CMB_RAW.[Channel], CSAT_CMB_RAW.[Type], CSAT_CMB_RAW.[Topic of the first Ticket], 
+ROSTER_RAW3.[Booking Login ID], COALESCE(CSAT_CMB_RAW.[Staff], ROSTER_RAW3.[TED Name]) AS [TED Name], ROSTER_RAW3.[cnx_email], 
+ROSTER_RAW3.[Booking Email], ROSTER_RAW3.[CUIC Name], ROSTER_RAW3.[Tenure days], ROSTER_RAW3.[LOB], CSAT_CMB_RAW.[Survey Id], 
+CSAT_CMB_RAW.[Reservation], CSAT_CMB_RAW.[Channel], CSAT_CMB_RAW.[Type], CSAT_CMB_RAW.[Topic of the first Ticket], 
 /*Set up Topic*/
 CASE 
 WHEN CSAT_CMB_RAW.[Topic of the first Ticket] IN ('room_did_not_meet_expectations','terms_conditions_and_policy') 
