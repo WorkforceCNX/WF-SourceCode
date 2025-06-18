@@ -530,6 +530,24 @@ Case When CSAT_CMB_RAW.[Csat 2.0 Score] <> 'No Answer' AND CSAT_CMB_RAW.[CSAT/PS
 (Case when CSAT_CMB_RAW.[Language] = 'English (Great Britain)' then (
 Case When CSAT_CMB_RAW.[Csat 2.0 Score] in ('Very Satisfied','Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' then 1 Else 0 End 
 ) Else 0 End) AS [Psat_Score(Bri)],
+/*Set up Psat_survey(UB)*/
+CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] <> 'No Answer' AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' 
+THEN (CASE WHEN ROSTER_RAW3.[LOB] = 'FR CSP' AND CSAT_CMB_RAW.[Language] = 'French' THEN 1
+		   WHEN ROSTER_RAW3.[LOB] = 'ES CSP' AND CSAT_CMB_RAW.[Language] = 'Spanish' THEN 1
+		   WHEN ROSTER_RAW3.[LOB] = 'IT CSP' AND CSAT_CMB_RAW.[Language] = 'Italian' THEN 1
+		   WHEN ROSTER_RAW3.[LOB] = 'DE CSP' AND CSAT_CMB_RAW.[Language] = 'German' THEN 1
+		   ELSE 0 
+	  END)
+ELSE 0 END AS [Psat_survey(UB)],
+/*Set up Psat_Score(UB)*/
+CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] in ('Very Satisfied','Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT'
+THEN (CASE WHEN ROSTER_RAW3.[LOB] = 'FR CSP' AND CSAT_CMB_RAW.[Language] = 'French' THEN 1
+		   WHEN ROSTER_RAW3.[LOB] = 'ES CSP' AND CSAT_CMB_RAW.[Language] = 'Spanish' THEN 1
+		   WHEN ROSTER_RAW3.[LOB] = 'IT CSP' AND CSAT_CMB_RAW.[Language] = 'Italian' THEN 1
+		   WHEN ROSTER_RAW3.[LOB] = 'DE CSP' AND CSAT_CMB_RAW.[Language] = 'German' THEN 1
+		   ELSE 0 
+	  END)
+ELSE 0 END AS [Psat_Score(UB)],
 /*Set up Phone_CSAT_TP*/
 (CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND CSAT_CMB_RAW.[Channel] = 'phone' AND [Type] = 'touchpoint'
 THEN (CASE WHEN (ROSTER_RAW3.[LOB] <> 'VICSG' OR ROSTER_RAW3.[LOB] IS NULL) THEN 1 
