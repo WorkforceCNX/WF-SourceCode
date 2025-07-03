@@ -293,8 +293,14 @@ RosterOT AS (
 SELECT ROSTER_RAW3.[Date], ROSTER_RAW3.[LOB],
 -- Setup [ScheduleHours(H)]
 Sum(CASE WHEN CHARINDEX('-', ROSTER_RAW3.[Shift]) = 5 THEN 7.50 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END) AS [ScheduleHours(H)],
+-- Setup [IO_Standard(H)]
+Sum(CASE WHEN CHARINDEX('-', ROSTER_RAW3.[Shift]) = 5 THEN 8 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 4 ELSE 0 END) AS [IO_Standard(H)],
+-- Setup [IO_Standard_ExcluBreak(H)]
+Sum(CASE WHEN CHARINDEX('-', ROSTER_RAW3.[Shift]) = 5 THEN 7.5 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END) AS [IO_Standard_ExcluBreak(H)],
 -- Setup [SchedLeave(H)]
 Sum(CASE WHEN ROSTER_RAW3.[Shift] IN ('AL','UPL','CO','VGH') THEN 7.50 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END) AS [SchedLeave(H)],
+-- Setup [SchedUPL(H)]
+Sum(CASE WHEN ROSTER_RAW3.[Shift] IN ('UPL') THEN 7.50 WHEN ROSTER_RAW3.[Shift] IN ('HSL') THEN 3.75 ELSE 0 END) AS [SchedUPL(H)],
 -- Setup [Schedule HC]
 Sum(CASE WHEN CHARINDEX('-', ROSTER_RAW3.[Shift]) = 5 THEN 1.0  WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 0.5 ELSE 0 END) AS [Schedule HC],
 -- Setup [Pega(H)]
@@ -349,6 +355,27 @@ When [Scheduled Activity] In ('Email 1','Open Time')
 Then [Length]*24 Else 0 End) As [Projected Email&Opentime]
 From BCOM.WpSummary Group by [Date],[LOB] 
 ),
+-- Create BCOM.CUIC 1 (RAW)
+CUIC_RAW AS (
+SELECT Staff_RAW.[Employee_ID], CAST([Interval] AS TIME) AS [Time], CAST([Interval] AS DATE) AS [Date], DATEADD(DAY, -1, CAST([Interval] AS DATE)) AS [D-1], ROSTER_RAW3.[Shift_type], [AgentAvailTime], [AgentLoggedOnTime] FROM BCOM.CUIC
+LEFT JOIN Staff_RAW ON Staff_RAW.[Booking Login ID] = [LoginName]
+LEFT JOIN ROSTER_RAW3 ON ROSTER_RAW3.[Date] = CAST([Interval] AS DATE) AND ROSTER_RAW3.[Emp ID] = Staff_RAW.[Employee_ID]
+),
+-- Create BCOM.CUIC 2 (Add: Session Date)
+CUIC_RAW2 AS (
+SELECT 
+CASE WHEN (CUIC_RAW.[Shift_type] <> 'DS' OR CUIC_RAW.[Shift_type] IS NULL) AND ROSTER_RAW3.[Shift_type] = 'NS' AND CUIC_RAW.[Time] < '12:00:00' THEN CUIC_RAW.[D-1] ELSE CUIC_RAW.[Date] END AS [Session Date],
+CUIC_RAW.[Employee_ID], SUM(CUIC_RAW.[AgentAvailTime]*24*3600) AS [AgentAvailTime(s)], SUM(CUIC_RAW.[AgentLoggedOnTime]*24*3600) AS [CUICLoggedTime(s)]
+FROM CUIC_RAW
+LEFT JOIN ROSTER_RAW3 ON ROSTER_RAW3.[Date] =  CUIC_RAW.[D-1] AND ROSTER_RAW3.[Emp ID] = CUIC_RAW.[Employee_ID]
+GROUP BY (CASE WHEN (CUIC_RAW.[Shift_type] <> 'DS' OR CUIC_RAW.[Shift_type] IS NULL) AND ROSTER_RAW3.[Shift_type] = 'NS' AND CUIC_RAW.[Time] < '12:00:00' THEN CUIC_RAW.[D-1] ELSE CUIC_RAW.[Date] END),CUIC_RAW.[Employee_ID]
+),
+-- Create BCOM.CUIC 3
+CUIC_RAW3 AS (
+SELECT CUIC_RAW2.[Session Date], ROSTER_RAW3.[LOB], SUM(CUIC_RAW2.[AgentAvailTime(s)])/3600 AS [AgentAvailTime(H)], SUM(CUIC_RAW2.[CUICLoggedTime(s)])/3600 AS [CUICLoggedTime(H)] FROM CUIC_RAW2
+LEFT JOIN ROSTER_RAW3 ON ROSTER_RAW3.[Date] = CUIC_RAW2.[Session Date] AND ROSTER_RAW3.[Emp ID] = CUIC_RAW2.[Employee_ID]
+GROUP BY CUIC_RAW2.[Session Date], ROSTER_RAW3.[LOB]
+),
 JEOPARDY AS (
 SELECT
 DailyReq.[Week_num],
@@ -397,11 +424,17 @@ ISNULL(RosterOT.[PEGA(H)],0) As [SchedPEGA(H)],
 ISNULL(RosterOT.[Schedule HC],0) As [Schedule HC],
 ISNULL(RosterOT.[OT(H)],0) As [OT(H)],
 ISNULL(Downtime.[Projected Training],0) As [Projected Training],
-ISNULL(Downtime.[Projected Offline],0) As [Projected Offline]
+ISNULL(Downtime.[Projected Offline],0) As [Projected Offline],
+ISNULL(CUIC_RAW3.[AgentAvailTime(H)],0) As [AgentAvailTime(H)],
+ISNULL(CUIC_RAW3.[CUICLoggedTime(H)],0) As [CUICLoggedTime(H)],
+ISNULL(RosterOT.[IO_Standard(H)],0) As [IO_Standard(H)],
+ISNULL(RosterOT.[IO_Standard_ExcluBreak(H)],0) As [IO_Standard_ExcluBreak(H)],
+ISNULL(RosterOT.[SchedUPL(H)],0) As [SchedUPL(H)]
 FROM DailyReq
 Left Join Downtime On DailyReq.[Date] = Downtime.[Date] And DailyReq.[LOB] = Downtime.[LOB]
 Left Join Shrink On DailyReq.[Week_num] = Shrink.[Week] And DailyReq.[LOB] = Shrink.[LOB]
 Left Join RosterOT On DailyReq.[Date] = RosterOT.[Date] And DailyReq.[LOB] = RosterOT.[LOB]
 Left Join Actual On DailyReq.[Date] = Actual.[Date] And DailyReq.[LOB] = Actual.[LOB]
+Left Join CUIC_RAW3 On DailyReq.[Date] = CUIC_RAW3.[Session Date] And DailyReq.[LOB] = CUIC_RAW3.[LOB]
 )
 SELECT * FROM JEOPARDY
