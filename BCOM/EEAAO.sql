@@ -226,8 +226,8 @@ CASE
     ELSE 'Undefined' END AS [LOB Group],
 -- Set up ScheduleSeconds(s)
 CASE
-    WHEN CHARINDEX('-', ROSTER_RAW2.[Original_Shift]) = 5 OR ROSTER_RAW2.[Original_Shift] IN ('UPL', 'PEGA') THEN 9 * 3600
-    WHEN ROSTER_RAW2.[Original_Shift] IN ('HAL', 'HSL') THEN 4 * 3600
+    WHEN CHARINDEX('-', ROSTER_RAW2.[Original_Shift]) = 5 OR ROSTER_RAW2.[Original_Shift] IN ('UPL', 'PEGA') THEN 7.5 * 3600
+    WHEN ROSTER_RAW2.[Original_Shift] IN ('HAL', 'HSL') THEN 3.75 * 3600
     ELSE 0
 END AS [ScheduleSeconds(s)]
 FROM ROSTER_RAW2
@@ -1004,7 +1004,17 @@ COALESCE(Target_LOB_RAW.[PSAT tar],                        Target_LOBGROUP_RAW.[
 COALESCE(Target_LOB_RAW.[PSAT Vietnamese tar],             Target_LOBGROUP_RAW.[PSAT Vietnamese tar])              as [PSAT Vietnamese tar],              -- combine Tar_LOB & Tar_LOBGROUP
 COALESCE(Target_LOB_RAW.[PSAT English (American) tar],     Target_LOBGROUP_RAW.[PSAT English (American) tar])      as [PSAT English (American) tar],      -- combine Tar_LOB & Tar_LOBGROUP
 COALESCE(Target_LOB_RAW.[PSAT English (Great Britain) tar],Target_LOBGROUP_RAW.[PSAT English (Great Britain) tar]) as [PSAT English (Great Britain) tar], -- combine Tar_LOB & Tar_LOBGROUP
-COALESCE(Target_LOB_RAW.[CSAT Reso tar],                   Target_LOBGROUP_RAW.[CSAT Reso tar])                    as [CSAT Reso tar]                     -- combine Tar_LOB & Tar_LOBGROUP
+COALESCE(Target_LOB_RAW.[CSAT Reso tar],                   Target_LOBGROUP_RAW.[CSAT Reso tar])                    as [CSAT Reso tar],                    -- combine Tar_LOB & Tar_LOBGROUP
+-- Setup [ScheduleHours(H)]
+CASE WHEN CHARINDEX('-', ROSTER_RAW3.[Shift]) = 5 THEN 7.50 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END AS [ScheduleHours(H)],
+-- Setup [IO_Standard(H)]
+CASE WHEN CHARINDEX('-', ROSTER_RAW3.[Shift]) = 5 THEN 8 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 4 ELSE 0 END AS [IO_Standard(H)],
+-- Setup [IO_Standard_ExcluBreak(H)]
+CASE WHEN CHARINDEX('-', ROSTER_RAW3.[Shift]) = 5 THEN 7.5 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END AS [IO_Standard_ExcluBreak(H)],
+-- Setup [SchedLeave(H)]
+CASE WHEN ROSTER_RAW3.[Shift] IN ('AL','UPL','CO','VGH') THEN 7.50 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END AS [SchedLeave(H)],
+-- Setup [SchedUPL(H)]
+CASE WHEN ROSTER_RAW3.[Shift] IN ('UPL') THEN 7.50 WHEN ROSTER_RAW3.[Shift] IN ('HSL') THEN 3.75 ELSE 0 END AS [SchedUPL(H)]
 FROM ROSTER_RAW3
 LEFT JOIN PremHday_RAW ON PremHday_RAW.[Date] = ROSTER_RAW3.[Date]
 LEFT JOIN RAMCO_RAW ON RAMCO_RAW.[EID] = ROSTER_RAW3.[Emp ID] AND RAMCO_RAW.[Date] = ROSTER_RAW3.[Date]
@@ -1286,7 +1296,12 @@ SELECT
 /*249 - Target*/ EEAAO_RAW.[PSAT Vietnamese tar],
 /*250 - Target*/ EEAAO_RAW.[PSAT English (American) tar],
 /*251 - Target*/ EEAAO_RAW.[PSAT English (Great Britain) tar],
-/*252 - Target*/ EEAAO_RAW.[CSAT Reso tar]
+/*252 - Target*/ EEAAO_RAW.[CSAT Reso tar],
+/*253 - ROSTER_RAW3*/ EEAAO_RAW.[ScheduleHours(H)],
+/*254 - ROSTER_RAW3*/ EEAAO_RAW.[IO_Standard(H)],
+/*255 - ROSTER_RAW3*/ EEAAO_RAW.[IO_Standard_ExcluBreak(H)],
+/*256 - ROSTER_RAW3*/ EEAAO_RAW.[SchedLeave(H)],
+/*257 - ROSTER_RAW3*/ EEAAO_RAW.[SchedUPL(H)]
 FROM EEAAO_RAW
 )
 SELECT * FROM EEAAO_RAW2
