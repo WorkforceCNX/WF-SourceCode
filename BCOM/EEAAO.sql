@@ -68,15 +68,14 @@ FROM GLB.RAMCO
 PremHday_RAW AS ( SELECT [Date],[Holiday] FROM GLB.PremHdays 
 ),
 -- Create BCOM.ROSTER 1 (RAW)
-ROSTER_RAW AS ( SELECT [Emp ID], [Attribute], [Value], [LOB], [team_leader], [week_shift], [week_off], [OM], [DPE], [Work Type] FROM BCOM.ROSTER 
+ROSTER_RAW AS ( SELECT [Emp ID], [Attribute], [Value], [LOB], [team_leader], [week_shift], [week_off], [OM], [DPE], [Work Type] FROM BCOM.ROSTER WHERE [Attribute] >= '2023-01-01'
 ),
 -- Create ROSTER(n-1) 1 (RAW)
-ROSTER_Pre1_RAW AS ( SELECT [Emp ID], [Attribute] AS [Date-1], [Value], [LOB], [team_leader], [week_shift], [week_off], [OM], [DPE], [Work Type] FROM BCOM.ROSTER 
+ROSTER_Pre1_RAW AS ( SELECT [Emp ID], [Attribute] AS [Date-1], [Value], [LOB], [team_leader], [week_shift], [week_off], [OM], [DPE], [Work Type] FROM BCOM.ROSTER WHERE [Attribute] >= '2023-01-01'
 ),
 -- Create BCOM.LTTransfers 1 (RAW)
 TRANSFER_RAW AS (      
-SELECT [EID], [LWD], [Remarks] 
-FROM BCOM.LTTransfers
+SELECT [EID], [LWD], [Remarks] FROM BCOM.LTTransfers WHERE [LWD] >= '2023-01-01'
 ),
 -- Create BCOM.ExceptionReq 1 (RAW)
 ExceptionReq_RAW AS (
@@ -88,13 +87,13 @@ GROUP BY [Date (MM/DD/YYYY)],[Emp ID]
 TERMINATION_RAW AS (   
 SELECT [EMPLOYEE_ID], [LWD], [Termination Reason] 
 FROM GLB.Termination 
-WHERE [Client Name ( Process )] = 'Bookingcom' And [JOB_ROLE] = 'Agent' And [COUNTRY] = 'Vietnam'
+WHERE [Client Name ( Process )] = 'Bookingcom' And [JOB_ROLE] = 'Agent' And [COUNTRY] = 'Vietnam' And [LWD] >= '2023-01-01'
 ),
 -- Create GLB.Resignation 1 (RAW)
 RESIGNATION_RAW AS (   
 SELECT [Employee ID], [Proposed Termination Date], [Resignation Primary Reason] 
 FROM GLB.Resignation 
-WHERE [MSA Client] = 'Bookingcom' And [Job Family] = 'Contact Center' And [Country] = 'Vietnam'
+WHERE [MSA Client] = 'Bookingcom' And [Job Family] = 'Contact Center' And [Country] = 'Vietnam' And [Proposed Termination Date] >= '2023-01-01'
 ),
 -- Create BCOM.EPS 1 (RAW)
 EPS_RAW AS ( 
@@ -652,14 +651,14 @@ Target_LOB_RAW As (
 Select 
 [Week],[Tenure days],[LOB],[Overall CPH tar],[Phone CPH tar],[Non Phone CPH tar],[Quality - Customer Impact tar],[Quality - Business Impact tar],[Quality - Compliance Impact tar],
 [Quality - Overall tar],[AHT Phone tar],[AHT Non-phone tar],[AHT Overall tar],[Hold (phone) tar],[AACW (phone) tar],[Avg Talk Time tar],[Phone CSAT tar],[Non phone CSAT tar],
-[Overall CSAT tar],[PSAT tar],[PSAT Vietnamese tar],[PSAT English (American) tar],[PSAT English (Great Britain) tar],[CSAT Reso tar] 
+[Overall CSAT tar],[PSAT tar],[PSAT Vietnamese tar],[PSAT English (American) tar],[PSAT English (Great Britain) tar],[CSAT Reso tar],[Quality - personalization tar],[Quality - proactivity tar],[Quality - resolution tar]
 From BCOM.KPI_Target
 ),
 -- Create BCOM.Target_LOBGROUP 1 (RAW)
 Target_LOBGROUP_RAW AS (
 Select [Week],[Tenure days],[LOB Group],[Overall CPH tar],[Phone CPH tar],[Non Phone CPH tar],[Quality - Customer Impact tar],[Quality - Business Impact tar],[Quality - Compliance Impact tar],
 [Quality - Overall tar],[AHT Phone tar],[AHT Non-phone tar],[AHT Overall tar],[Hold (phone) tar],[AACW (phone) tar],[Avg Talk Time tar],[Phone CSAT tar],[Non phone CSAT tar],
-[Overall CSAT tar],[PSAT tar],[PSAT Vietnamese tar],[PSAT English (American) tar],[PSAT English (Great Britain) tar],[CSAT Reso tar]
+[Overall CSAT tar],[PSAT tar],[PSAT Vietnamese tar],[PSAT English (American) tar],[PSAT English (Great Britain) tar],[CSAT Reso tar],[Quality - personalization tar],[Quality - proactivity tar],[Quality - resolution tar]
 From BCOM.KPI_Target Where [LOB] IS NULL
 ),
 -- Create BCOM.Quality 1 (RAW)
@@ -1012,6 +1011,9 @@ COALESCE(Target_LOB_RAW.[PSAT Vietnamese tar],             Target_LOBGROUP_RAW.[
 COALESCE(Target_LOB_RAW.[PSAT English (American) tar],     Target_LOBGROUP_RAW.[PSAT English (American) tar])      as [PSAT English (American) tar],      -- combine Tar_LOB & Tar_LOBGROUP
 COALESCE(Target_LOB_RAW.[PSAT English (Great Britain) tar],Target_LOBGROUP_RAW.[PSAT English (Great Britain) tar]) as [PSAT English (Great Britain) tar], -- combine Tar_LOB & Tar_LOBGROUP
 COALESCE(Target_LOB_RAW.[CSAT Reso tar],                   Target_LOBGROUP_RAW.[CSAT Reso tar])                    as [CSAT Reso tar],                    -- combine Tar_LOB & Tar_LOBGROUP
+COALESCE(Target_LOB_RAW.[Quality - personalization tar],   Target_LOBGROUP_RAW.[Quality - personalization tar])    as [Quality - personalization tar],    -- combine Tar_LOB & Tar_LOBGROUP
+COALESCE(Target_LOB_RAW.[Quality - proactivity tar],       Target_LOBGROUP_RAW.[Quality - proactivity tar])        as [Quality - proactivity tar],        -- combine Tar_LOB & Tar_LOBGROUP
+COALESCE(Target_LOB_RAW.[Quality - resolution tar],        Target_LOBGROUP_RAW.[Quality - resolution tar])         as [Quality - resolution tar],         -- combine Tar_LOB & Tar_LOBGROUP
 -- Setup [ScheduleHours(H)]
 CASE WHEN CHARINDEX('-', ROSTER_RAW3.[Shift]) = 5 THEN 7.50 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END AS [ScheduleHours(H)],
 -- Setup [IO_Standard(H)]
@@ -1311,11 +1313,14 @@ SELECT
 /*257 - Target*/ EEAAO_RAW.[PSAT English (American) tar],
 /*258 - Target*/ EEAAO_RAW.[PSAT English (Great Britain) tar],
 /*259 - Target*/ EEAAO_RAW.[CSAT Reso tar],
-/*260 - ROSTER_RAW3*/ EEAAO_RAW.[ScheduleHours(H)],
-/*261 - ROSTER_RAW3*/ EEAAO_RAW.[IO_Standard(H)],
-/*262 - ROSTER_RAW3*/ EEAAO_RAW.[IO_Standard_ExcluBreak(H)],
-/*263 - ROSTER_RAW3*/ EEAAO_RAW.[SchedLeave(H)],
-/*264 - ROSTER_RAW3*/ EEAAO_RAW.[SchedUPL(H)]
+/*260 - Target*/ [Quality - personalization tar],
+/*261 - Target*/ [Quality - proactivity tar],
+/*262 - Target*/ [Quality - resolution tar],
+/*263 - ROSTER_RAW3*/ EEAAO_RAW.[ScheduleHours(H)],
+/*264 - ROSTER_RAW3*/ EEAAO_RAW.[IO_Standard(H)],
+/*265 - ROSTER_RAW3*/ EEAAO_RAW.[IO_Standard_ExcluBreak(H)],
+/*266 - ROSTER_RAW3*/ EEAAO_RAW.[SchedLeave(H)],
+/*267 - ROSTER_RAW3*/ EEAAO_RAW.[SchedUPL(H)]
 FROM EEAAO_RAW
 )
 SELECT * FROM EEAAO_RAW2
