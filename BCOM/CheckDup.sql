@@ -203,6 +203,7 @@ Group by cast([Day of Date] as varchar)+[Staff Name]+[Operator Def]+[Service Cas
 TEDNAME as (
 Select [TED Name], COUNT(*) as [Count]
 From BCOM.Staff
+Where [TED Name] is not null
 Group by [TED Name] Having COUNT(*)>1
 ),
 -- 31. BCOM.OTReq
@@ -242,15 +243,15 @@ Select '05' as [No.], Count(*) as [CheckDup], 'CSAT Reso Raw' as [Table], '' as 
 From CSAT_Reso_Raw 
 UNION ALL
 ------[📥]--CUIC_Raw1
-Select '06' as [No.], Count(*) as [CheckDup], 'CUIC Raw' as [Table], '' as [Note]
+Select '06' as [No.], Count(*) as [CheckDup], 'CUIC Raw' as [Table], '10000' as [Note]
 From CUIC_Raw1 
 UNION ALL
 ------[📥]--EPS_Raw1
-Select '07' as [No.], Count(*) as [CheckDup], 'EPS Raw' as [Table], '' as [Note]
+Select '07' as [No.], Count(*) as [CheckDup], 'EPS Raw' as [Table], '5000' as [Note]
 From EPS_Raw1 
 UNION ALL
 ------[📥]--Exception_Req
-Select '08' as [No.], Count(*) as [CheckDup], 'Exception Req' as [Table], '' as [Note]
+Select '08' as [No.], Count(*) as [CheckDup], 'Exception Req' as [Table], '1500' as [Note]
 From Exception_Req 
 UNION ALL
 ------[📥]--HC_Transfer
@@ -290,7 +291,7 @@ Select '17' as [No.], Count(*) as [CheckDup], 'PSAT' as [Table], '' as [Note]
 From PSAT_Raw1 
 UNION ALL
 ------[📥]--Quality_Raw1
-Select '18' as [No.], Count(*) as [CheckDup], 'Quality_Raw' as [Table], '' as [Note]
+Select '18' as [No.], Count(*) as [CheckDup], 'Quality_Raw' as [Table], '1500' as [Note]
 From Quality_Raw1 
 UNION ALL
 ------[📥]--Ramco_Raw1
@@ -326,7 +327,7 @@ Select '26' as [No.], Count(*) as [CheckDup], 'Ticket Raw' as [Table], '' as [No
 From Ticket_Raw1 
 UNION ALL
 ------[📥]--Workplan_Raw1
-Select '27' as [No.], Count(*) as [CheckDup], 'Workplan Raw' as [Table], '' as [Note]
+Select '27' as [No.], Count(*) as [CheckDup], 'Workplan Raw' as [Table], '400' as [Note]
 From Workplan_Raw1 
 UNION ALL
 ------[📥]--Workplan_Summary
@@ -334,7 +335,7 @@ Select '28' as [No.], Count(*) as [CheckDup], 'Workplan Summary Raw' as [Table],
 From Workplan_Summary 
 UNION ALL
 ------[📥]--IPH_PEGA
-Select '29' as [No.], Count(*) as [CheckDup], 'IPH_PEGA' as [Table], '' as [Note]
+Select '29' as [No.], Count(*) as [CheckDup], 'IPH_PEGA' as [Table], '30' as [Note]
 From IPH_PEGA 
 UNION ALL     
 ------[📥]--TED Name
