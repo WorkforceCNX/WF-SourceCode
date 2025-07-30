@@ -247,7 +247,7 @@ Select '06' as [No.], Count(*) as [CheckDup], 'CUIC Raw' as [Table], '10000' as 
 From CUIC_Raw1 
 UNION ALL
 ------[📥]--EPS_Raw1
-Select '07' as [No.], Count(*) as [CheckDup], 'EPS Raw' as [Table], '5000' as [Note]
+Select '07' as [No.], Count(*) as [CheckDup], 'EPS Raw' as [Table], '150' as [Note]
 From EPS_Raw1 
 UNION ALL
 ------[📥]--Exception_Req

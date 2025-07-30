@@ -252,7 +252,7 @@ SELECT
 EPS_RAW2.[Shift], EPS_RAW2.[Shift_type], ROSTER_RAW2.[Shift] AS [Shift-1], ROSTER_RAW2.[Shift_type] AS [Shifttype-1], 
 CASE 
 WHEN (EPS_RAW2.[Shift_type] IS NULL OR EPS_RAW2.[Shift_type] <> 'DS')
-AND ROSTER_RAW2.[Shift_type] = 'NS'
+AND ROSTER_RAW2.[Shift_type] = 'NS' 
 AND EPS_RAW2.[Time_Login_VN] < '12:00:00'
 THEN EPS_RAW2.[PreviousDate_Login_VN] 
 ELSE EPS_RAW2.[Date_Login_VN] END AS [Date],
