@@ -245,22 +245,30 @@ ROSTER_RAW2.[Shift], ROSTER_RAW2.[Shift_type], Staff_RAW.[Employee_ID], EPS_RAW.
 EPS_RAW.[PreviousDate_Login_VN], EPS_RAW.[Time_Login_VN], EPS_RAW.[SessionLogout_VN], EPS_RAW.[Date_Logout_VN], EPS_RAW.[Time_Logout_VN], EPS_RAW.[NightTime], EPS_RAW.[DayTime], EPS_RAW.[Night_BPE], EPS_RAW.[Day_BPE] 
 FROM EPS_RAW
 LEFT JOIN Staff_RAW ON EPS_RAW.[Username] = Staff_RAW.[Booking Login ID] 
-LEFT JOIN ROSTER_RAW2 ON Staff_RAW.[Employee_ID] = ROSTER_RAW2.[Emp ID] And EPS_RAW.[Date_Login_VN] = ROSTER_RAW2.[Date] ),
+LEFT JOIN ROSTER_RAW2 ON Staff_RAW.[Employee_ID] = ROSTER_RAW2.[Emp ID] And EPS_RAW.[Date_Login_VN] = ROSTER_RAW2.[Date] 
+),
 -- Create BCOM.EPS 3 (Add: Final Date)
 EPS_RAW3 AS (
 SELECT
-EPS_RAW2.[Shift], EPS_RAW2.[Shift_type], ROSTER_RAW2.[Shift] AS [Shift-1], ROSTER_RAW2.[Shift_type] AS [Shifttype-1], 
+EPS_RAW2.[Shift], EPS_RAW2.[Shift_type], ROSTER_RAW2.[Shift] AS [Shift-1], ROSTER_RAW2.[Shift_type] AS [Shifttype-1],
+--Set final date---------------------------------------
 CASE 
-WHEN (EPS_RAW2.[Shift_type] IS NULL OR EPS_RAW2.[Shift_type] <> 'DS')
-AND ROSTER_RAW2.[Shift_type] = 'NS' 
-AND EPS_RAW2.[Time_Login_VN] < '12:00:00'
+WHEN (EPS_RAW2.[Shift_type] IS NULL OR EPS_RAW2.[Shift_type] <> 'DS') -- Today shift type not Null and <> DS
+AND ROSTER_RAW2.[Shift_type] = 'NS' -- Yesterday is NS
+AND EPS_RAW2.[Time_Login_VN] < '12:00:00' -- Get all record < 12H to yesterday session
+THEN EPS_RAW2.[PreviousDate_Login_VN] 
+WHEN ROSTER_RAW2.[Shift] In ('1100-2000', '1200-2100', '1300-2200', '1400-2300') -- Yesterday Shift in...
+AND ISNULL(RegisteredOT_RAW.[OT_Registered(s)],0) > 0 -- and agent also do OT
+AND EPS_RAW2.[Time_Login_VN] < '5:00:00' -- Get all record < 5h to yesterday session
 THEN EPS_RAW2.[PreviousDate_Login_VN] 
 ELSE EPS_RAW2.[Date_Login_VN] END AS [Date],
+--------------------------------------------------------
 EPS_RAW2.[Employee_ID], EPS_RAW2.[Username], EPS_RAW2.[Session Login], EPS_RAW2.[Session Logout], EPS_RAW2.[Session Time], EPS_RAW2.[BPE Code], 
 EPS_RAW2.[Total Time], EPS_RAW2.[SessionLogin_VN], EPS_RAW2.[Date_Login_VN], EPS_RAW2.[PreviousDate_Login_VN], EPS_RAW2.[Time_Login_VN], EPS_RAW2.[SessionLogout_VN], 
 EPS_RAW2.[Date_Logout_VN], EPS_RAW2.[Time_Logout_VN], EPS_RAW2.[NightTime], EPS_RAW2.[DayTime], EPS_RAW2.[Night_BPE], EPS_RAW2.[Day_BPE] 
 FROM EPS_RAW2
 LEFT JOIN ROSTER_RAW2 ON EPS_RAW2.[Employee_ID] = ROSTER_RAW2.[Emp ID] And EPS_RAW2.[PreviousDate_Login_VN] = ROSTER_RAW2.[Date]
+LEFT JOIN RegisteredOT_RAW ON EPS_RAW2.[Employee_ID] = RegisteredOT_RAW.[Emp ID] AND EPS_RAW2.[PreviousDate_Login_VN] = RegisteredOT_RAW.[Date]
 ),
 -- Create BCOM.EPS 4 (Add: Data's Pivoted)
 EPS_RAW4 AS (
