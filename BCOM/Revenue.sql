@@ -119,10 +119,10 @@ LEFT JOIN Staff_RAW ON COALESCE(ROSTER_RAW2.[Emp ID], TRANSFER_RAW.[EID], TERMIN
 -- Create BCOM.CapHC 1
 CapHC AS (
 SELECT [LOB],[Date],[Client Requirement (Hours)], 
-Case when [LOB] IN ('EN','FR','IT') then ([Client Requirement (Hours)]*95/100)*40/100 Else 0 End as [Night_Prod_Req],
-Case when [LOB] IN ('EN','FR','IT') then ([Client Requirement (Hours)]*95/100) - (([Client Requirement (Hours)]*95/100)*40/100) Else ([Client Requirement (Hours)]*95/100) End as [Day_Prod_Req],
-Case when [LOB] IN ('EN','FR','IT') then ([Client Requirement (Hours)]*5/100)*40/100 Else 0 End as [Night_Downtime_Req],
-Case when [LOB] IN ('EN','FR','IT') then ([Client Requirement (Hours)]*5/100) - (([Client Requirement (Hours)]*5/100)*40/100) Else ([Client Requirement (Hours)]*5/100) End as [Day_Downtime_Req]
+Case when [LOB] IN ('EN','FR','IT') then ([Client Requirement (Hours)]*95/100)*20/100 Else 0 End as [Night_Prod_Req],
+Case when [LOB] IN ('EN','FR','IT') then ([Client Requirement (Hours)]*95/100) - (([Client Requirement (Hours)]*95/100)*20/100) Else ([Client Requirement (Hours)]*95/100) End as [Day_Prod_Req],
+Case when [LOB] IN ('EN','FR','IT') then ([Client Requirement (Hours)]*5/100)*20/100 Else 0 End as [Night_Downtime_Req],
+Case when [LOB] IN ('EN','FR','IT') then ([Client Requirement (Hours)]*5/100) - (([Client Requirement (Hours)]*5/100)*20/100) Else ([Client Requirement (Hours)]*5/100) End as [Day_Downtime_Req]
 FROM BCOM.CapHC
 ),
 -- Create BCOM.CapHC 2
@@ -171,20 +171,34 @@ SELECT [Date], [LOB], [Hours] AS [Newhire_Req] FROM BCOM.RampHC
 -- Create Budget
 Budget AS (
 Select
-COALESCE(IntervalReq2.[Date],IntervalReq3.[Date_VN],CapHC2.[Date])          as [Date],
-COALESCE(IntervalReq2.[LOB],IntervalReq3.[LOB],CapHC2.[LOB])                as [LOB],
-COALESCE(IntervalReq2.[Night_Prod_req],        CapHC2.[Night_Prod_req])     as [Night_Prod_req],
-COALESCE(IntervalReq2.[Day_Prod_req],          CapHC2.[Day_Prod_req])       as [Day_Prod_req],
-COALESCE(IntervalReq2.[Night_Downtime_req],    CapHC2.[Night_Downtime_req]) as [Night_Downtime_req],
-COALESCE(IntervalReq2.[Day_Downtime_req],      CapHC2.[Day_Downtime_req])   as [Day_Downtime_req],
-COALESCE(IntervalReq2.[PH_req],                CapHC2.[PH_req])             as [PH_req],
-COALESCE(IntervalReq3.[Night_Prod_req_VN],     CapHC2.[Night_Prod_req])     as [Night_Prod_req_VN],
-COALESCE(IntervalReq3.[Day_Prod_req_VN],       CapHC2.[Day_Prod_req])       as [Day_Prod_req_VN],
-COALESCE(IntervalReq3.[Night_Downtime_req_VN], CapHC2.[Night_Downtime_req]) as [Night_Downtime_req_VN],
-COALESCE(IntervalReq3.[Day_Downtime_req_VN],   CapHC2.[Day_Downtime_req])   as [Day_Downtime_req_VN]
+COALESCE(IntervalReq2.[Date],IntervalReq3.[Date_VN],CapHC2.[Date])               as [Date],
+COALESCE(IntervalReq2.[LOB], IntervalReq3.[LOB],    CapHC2.[LOB])                as [LOB],
+sum(isnull(COALESCE(IntervalReq2.[Night_Prod_req],        CapHC2.[Night_Prod_req]),0))     as [Night_Prod_req],
+sum(isnull(COALESCE(IntervalReq2.[Day_Prod_req],          CapHC2.[Day_Prod_req]),0))       as [Day_Prod_req],
+sum(isnull(COALESCE(IntervalReq2.[Night_Downtime_req],    CapHC2.[Night_Downtime_req]),0)) as [Night_Downtime_req],
+sum(isnull(COALESCE(IntervalReq2.[Day_Downtime_req],      CapHC2.[Day_Downtime_req]),0))   as [Day_Downtime_req],
+sum(isnull(COALESCE(IntervalReq2.[PH_req],                CapHC2.[PH_req]),0))             as [PH_req],
+
+sum(isnull(COALESCE(IntervalReq3.[Night_Prod_req_VN],     CapHC2.[Night_Prod_req]),0))     as [Night_Prod_req_VN],
+sum(isnull(COALESCE(IntervalReq3.[Day_Prod_req_VN],       CapHC2.[Day_Prod_req]),0))       as [Day_Prod_req_VN],
+sum(isnull(COALESCE(IntervalReq3.[Night_Downtime_req_VN], CapHC2.[Night_Downtime_req]),0)) as [Night_Downtime_req_VN],
+sum(isnull(COALESCE(IntervalReq3.[Day_Downtime_req_VN],   CapHC2.[Day_Downtime_req]),0))   as [Day_Downtime_req_VN],
+
+sum(isnull(IntervalReq3.[Night_Prod_req_VN],0)) AS [ProdNight_Interval],
+sum(isnull(IntervalReq3.[Day_Prod_req_VN],0)) AS [ProdDay_Interval],
+sum(isnull(IntervalReq3.[Night_Downtime_req_VN],0)) AS [DowntimeNight_Interval],
+sum(isnull(IntervalReq3.[Day_Downtime_req_VN],0)) AS [DowntimeDay_Interval],
+sum(isnull(CapHC2.[Night_Prod_req],0)) AS [ProdNight_CapHC],
+sum(isnull(CapHC2.[Day_Prod_req],0)) AS [ProdDay_CapHC],
+sum(isnull(CapHC2.[Night_Downtime_req],0)) AS [DowntimeNight_CapHC],
+sum(isnull(CapHC2.[Day_Downtime_req],0)) AS [DowntimeDay_CapHC]
+
 From CapHC2
 Full Join IntervalReq2 On CapHC2.[LOB] = IntervalReq2.[LOB] And CapHC2.[Date] = IntervalReq2.[Date]
 Full Join IntervalReq3 On CapHC2.[LOB] = IntervalReq3.[LOB] And CapHC2.[Date] = IntervalReq3.[Date_VN]
+group by 
+COALESCE(IntervalReq2.[Date],IntervalReq3.[Date_VN],CapHC2.[Date]),
+COALESCE(IntervalReq2.[LOB], IntervalReq3.[LOB],    CapHC2.[LOB]) 
 ),
 -- Create BCOM.EPS 1 (RAW)
 EPS_RAW AS ( 
@@ -326,27 +340,27 @@ CASE
 WHEN FORMAT(DATEPART(ISO_WEEK, COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])),'00') < 3 AND MONTH(COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])) > 10
 THEN CONCAT(YEAR(COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date]))+1, FORMAT(DATEPART(ISO_WEEK, COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])),'00'))
 ELSE CONCAT(YEAR(COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])), FORMAT(DATEPART(ISO_WEEK, COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])),'00')) 
-END                                                                                    AS [Week_num],
-COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])                            AS [Date],
-COALESCE(ActualRevenue.[LOB],Budget.[LOB],NewHire.[LOB])                               AS [LOB],
-SUM(ISNULL(ActualRevenue.[ACT_Night_Productive],0)                                  )  AS [ACT_Night_Prod],
-SUM(ISNULL(ActualRevenue.[ACT_Day_Productive]-ActualRevenue.[ACT_OTRegistered],0)   )  AS [ACT_Day_Prod],
-SUM(ISNULL(ActualRevenue.[ACT_Night_Downtime],0)                                    )  AS [ACT_Night_Downtime],
-SUM(ISNULL(ActualRevenue.[ACT_Day_Downtime],0)                                      )  AS [ACT_Day_Downtime],
-SUM(ISNULL(ActualRevenue.[ACT_NewHire_Training],0)                                  )  AS [ACT_NewHireTrain],
-SUM(ISNULL(ActualRevenue.[ACT_PH],0)                                                )  AS [ACT_PH],
-SUM(ISNULL(ActualRevenue.[ACT_OTRegistered],0)                                      )  AS [ACT_OTRegis],
-SUM(ISNULL(Budget.[Night_Prod_req],0)                                               )  AS [REQ_Night_Prod],
-SUM(ISNULL(Budget.[Day_Prod_req],0)                                                 )  AS [REQ_Day_Prod],
-SUM(ISNULL(Budget.[Night_Downtime_req],0)                                           )  AS [REQ_Night_Downtime],
-SUM(ISNULL(Budget.[Day_Downtime_req],0)                                             )  AS [REQ_Day_Downtime],
-SUM(ISNULL(Budget.[PH_req],0)                                                       )  AS [REQ_PH],
-SUM(ISNULL(NewHire.[Newhire_Req],0)                                                 )  AS [REQ_NewHire],
-'Hours'                                                                                AS [Type],
-SUM(ISNULL(Budget.[Night_Prod_req_VN],0)                                            )  AS [ProdNight_Ratio], 
-SUM(ISNULL(Budget.[Day_Prod_req_VN],0)                                              )  AS [ProdDay_Ratio], 
-SUM(ISNULL(Budget.[Night_Downtime_req_VN],0)                                        )  AS [DowntimeNight_Ratio], 
-SUM(ISNULL(Budget.[Day_Downtime_req_VN],0)                                          )  AS [DowntimeDay_Ratio]
+END                                                                                        AS [Week_num],
+COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])                                AS [Date],
+COALESCE(ActualRevenue.[LOB],Budget.[LOB],NewHire.[LOB])                                   AS [LOB],
+SUM(ISNULL(ActualRevenue.[ACT_Night_Productive],0)                                  )      AS [ACT_Night_Prod],
+SUM(ISNULL(ActualRevenue.[ACT_Day_Productive]-ActualRevenue.[ACT_OTRegistered],0)   )      AS [ACT_Day_Prod],
+SUM(ISNULL(ActualRevenue.[ACT_Night_Downtime],0)                                    )      AS [ACT_Night_Downtime],
+SUM(ISNULL(ActualRevenue.[ACT_Day_Downtime],0)                                      )      AS [ACT_Day_Downtime],
+SUM(ISNULL(ActualRevenue.[ACT_NewHire_Training],0)                                  )      AS [ACT_NewHireTrain],
+SUM(ISNULL(ActualRevenue.[ACT_PH],0)                                                )      AS [ACT_PH],
+SUM(ISNULL(ActualRevenue.[ACT_OTRegistered],0)                                      )      AS [ACT_OTRegis],
+SUM(ISNULL(Budget.[Night_Prod_req],0)                                               )      AS [REQ_Night_Prod],
+SUM(ISNULL(Budget.[Day_Prod_req],0)                                                 )      AS [REQ_Day_Prod],
+SUM(ISNULL(Budget.[Night_Downtime_req],0)                                           )      AS [REQ_Night_Downtime],
+SUM(ISNULL(Budget.[Day_Downtime_req],0)                                             )      AS [REQ_Day_Downtime],
+SUM(ISNULL(Budget.[PH_req],0)                                                       )      AS [REQ_PH],
+SUM(ISNULL(NewHire.[Newhire_Req],0)                                                 )      AS [REQ_NewHire],
+'Hours'                                                                                    AS [Type],
+SUM(ISNULL(Budget.[Night_Prod_req_VN],0)                                            )      AS [ProdNight_Ratio], 
+SUM(ISNULL(Budget.[Day_Prod_req_VN],0)                                              )      AS [ProdDay_Ratio], 
+SUM(ISNULL(Budget.[Night_Downtime_req_VN],0)                                        )      AS [DowntimeNight_Ratio], 
+SUM(ISNULL(Budget.[Day_Downtime_req_VN],0)                                          )      AS [DowntimeDay_Ratio]
 From ActualRevenue 
 Full Join Budget On ActualRevenue.[LOB] = Budget.[LOB] And ActualRevenue.[Date] = Budget.[Date] 
 Full Join NewHire On ActualRevenue.[LOB] = NewHire.[LOB] And ActualRevenue.[Date] = NewHire.[Date]
