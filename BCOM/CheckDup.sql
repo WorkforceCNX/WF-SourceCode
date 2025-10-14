@@ -219,6 +219,13 @@ Select cast([Date] as varchar)+[LOB] as [Concat], COUNT(*) as [Count]
 From BCOM.ProjectedHC
 Where cast([Date] as varchar)+[LOB] is not Null
 Group by cast([Date] as varchar)+[LOB] Having COUNT(*)>1
+),
+-- 33. BCOM.SEAT
+SEAT as (
+Select cast([Date] as varchar)+[TED Name]+[Seat No] as [Concat], COUNT(*) as [Count]
+From BCOM.SEAT
+Where cast([Date] as varchar)+[TED Name]+[Seat No] is not Null
+Group by cast([Date] as varchar)+[TED Name]+[Seat No] Having COUNT(*)>1
 )
 ------------------------[CheckDup]Process------------------------
 
@@ -349,3 +356,7 @@ UNION ALL
 ------[📥]--PROHC
 Select '32' as [No.], Count(*) as [CheckDup], 'PROHC' as [Table], 'IMPORTANT' as [Note]
 From PROHC
+UNION ALL
+------[📥]--SEAT
+Select '33' as [No.], Count(*) as [CheckDup], 'SEAT' as [Table], '' as [Note]
+From SEAT
