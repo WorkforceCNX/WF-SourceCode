@@ -1,0 +1,42 @@
+/*
+Code by @Dimzcraft.
+(c) Don't use any Code without permission
+*/
+{
+  "item_panel_image": {
+    "modifications": [
+      {
+        "control_name": "item_text_label",
+        "operation": "remove"
+      },
+      {
+        "array_name": "controls",
+        "operation": "insert_front",
+        "value": [
+          {
+            "selected_item_data@container_item_data_ds-dtv.total_data": {}
+          },
+          {
+            "item_text_label_new@common_ds-dtv.item_text_label": {}
+          }
+        ]
+      }
+    ]
+  },
+  
+  "highlight_slot_panel/highlight": {
+    "modifications": [
+      {
+        "control_name": "hover_text",
+        "operation": "remove"
+      },
+      {
+        "array_name": "controls",
+        "operation": "insert_front",
+        "value": {
+          "hover_text_new@common_ds-dtv.hover_text": {}
+        }
+      }
+    ]
+  }
+}

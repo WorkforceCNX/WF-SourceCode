@@ -1,0 +1,107 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:armadillo",
+      "materials": {
+        "default": "armadillo",
+        "hp": "entity_emissive_alpha"
+      },
+      "geometry": {
+        "default": "geometry.armadillo",
+        "health_bar": "geometry.health_bar",
+        "heart": "geometry.heart",
+        "dmg": "geometry.dmg"
+      },
+      "textures": {
+        "default": "textures/entity/armadillo",
+        "health_green": "textures/heart/health_bar_green",
+        "health_yellow": "textures/heart/health_bar_yellow",
+        "health_red": "textures/heart/health_bar_red",
+        "heart": "textures/heart/heart",
+        "heart0": "textures/heart/heart0",
+        "heart1": "textures/heart/heart1",
+        "heart2": "textures/heart/heart2",
+        "heart3": "textures/heart/heart3",
+        "heart4": "textures/heart/heart4",
+        "heart5": "textures/heart/heart5",
+        "heart6": "textures/heart/heart6",
+        "heart7": "textures/heart/heart7",
+        "heart8": "textures/heart/heart8",
+        "heart9": "textures/heart/heart9"
+      },
+      "render_controllers": [
+        "controller.render.armadillo",
+        "controller.render.health_bar",
+        "controller.render.heart",
+        "controller.render.first_digit",
+        "controller.render.second_digit",
+        "controller.render.third_digit",
+        "controller.render.dmg"
+      ],
+      "scripts": {
+        "pre_animation": [
+          "variable.x_head_rotation = math.clamp(query.target_x_rotation, -32.5, 32.5);",
+          "variable.y_head_rotation = math.clamp(query.target_y_rotation, -22.5, 25);",
+          "variable.is_rolled_up = query.property('minecraft:armadillo_state') != 'unrolled';",
+          "variable.rolled_up_time = variable.is_rolled_up ? ((variable.rolled_up_time ?? 0.0) + query.delta_time) : 0.0;",
+          "variable.is_peeking = query.property('minecraft:armadillo_state') == 'rolled_up_peeking';",
+          "variable.is_unrolling = query.property('minecraft:armadillo_state') == 'rolled_up_unrolling';",
+          "variable.unrolling_time = variable.is_unrolling ? ((variable.unrolling_time ?? 0.0) + query.delta_time) : 0.0;",
+          "variable.use_rolled_up_model = variable.rolled_up_time >= 0.2083 && (variable.unrolling_time == 0.0 || variable.unrolling_time <= 1.25 );",
+          "variable.walking = query.modified_move_speed > 0.01 && !variable.is_rolled_up;",
+          "variable.walk_anim_time_update = query.anim_time + math.min(3.0, math.lerp(2.0, 5.0, query.modified_move_speed)) * query.delta_time;",
+          "variable.health = query.health / query.max_health;",
+          "variable.health_color = math.round(query.health / query.max_health * 100) >= 50 ? 0 : ((math.round(query.health / query.max_health * 100) >= 25 && math.round(query.health / query.max_health * 100) < 50) ? 1 : 2);",
+          "variable.first_digit = math.floor(query.health / 100);",
+          "variable.second_digit = math.floor((math.mod(query.health, 100)) / 10);",
+          "variable.third_digit = query.health - ((math.floor(query.health / 10)) * 10);"
+        ],
+        "animate": [
+          "look_at_target_controller",
+          "walk_controller",
+          "roll_up_controller",
+          "hp_offset",
+          "health_percentage",
+          "dmg_controller"
+        ],
+        "should_update_effects_offscreen": "1.0",
+        "variables": {
+          "variable.hp": "public"
+        },
+        "initialize": [
+          "variable.hp = query.health;"
+        ]
+      },
+      "animations": {
+        "look_at_target": "animation.armadillo.look_at_target",
+        "look_at_target_controller": "controller.animation.armadillo.look_at_target",
+        "walk": "animation.armadillo.walk",
+        "walk_controller": "controller.animation.armadillo.walk",
+        "roll_up": "animation.armadillo.roll_up",
+        "rolled_up": "animation.armadillo.rolled_up",
+        "peek": "animation.armadillo.peek",
+        "unroll": "animation.armadillo.unroll",
+        "unroll_fast": "animation.armadillo.unroll_fast",
+        "roll_up_controller": "controller.animation.armadillo.roll_up",
+        "dmg_controller": "controller.animation.damage.root",
+        "hp_offset": "animation.health_turtle",
+        "health_percentage": "animation.health_bar.percentage"
+      },
+      "sound_effects": {
+        "roll": "mob.armadillo.roll",
+        "land": "mob.armadillo.land",
+        "peek": "mob.armadillo.peek",
+        "unroll_start": "mob.armadillo.unroll_start",
+        "unroll_finish": "mob.armadillo.unroll_finish"
+      },
+      "particle_effects": {
+        "dmg": "particle:damage"
+      },
+      "spawn_egg": {
+        "base_color": "#ad716d",
+        "overlay_color": "#824848"
+      }
+    }
+  }
+}

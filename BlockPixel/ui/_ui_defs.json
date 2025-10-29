@@ -1,0 +1,11 @@
+/*
+Code by @Dimzcraft.
+(c) Don't use any Code without permission
+*/
+{
+  "ui_defs": [
+    "ui/dimz_modules/durability_tools_viewer/container_item_data.uids",
+    "ui/dimz_modules/durability_tools_viewer/hud.uids",
+    "ui/dimz_modules/durability_tools_viewer/ui_common.uids"
+  ]
+}

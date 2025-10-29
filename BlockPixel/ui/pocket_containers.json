@@ -1,0 +1,22 @@
+/*
+Code by @Dimzcraft.
+(c) Don't use any Code without permission
+*/
+{
+  "panel": {
+    "$use_combined_hotbar_and_inventory": true
+  },
+  
+  "ender_chest_panel": {
+    "$is_chest_screen": true
+  },
+  
+  "small_chest_panel": {
+    "$is_chest_screen": true
+  },
+  
+  "large_chest_panel": {
+    "$is_chest_screen": true,
+    "$is_large_chest": true
+  }
+}

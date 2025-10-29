@@ -1,0 +1,32 @@
+{
+  ////* Durability Tools Viewer HUD *////
+  "$dimz_dtv_offset": [ -10, -5 ],
+  "$dimz_dtv_anchor_from": "bottom_right",
+  "$dimz_dtv_anchor_to": "bottom_right",
+  "$dimz_dtv_reverse": "right", // possible right or left
+  "$dimz_dtv_use_item_renderer": true,
+  
+  
+  ////* Label *////
+  "$dimz_dtv_label_color": "$chat_text_color",
+  "$dimz_dtv_label_shadow": true,
+  "$dimz_dtv_label_background_size": [ "100%c + 10px", "100%c + 5px" ],
+  "$dimz_dtv_label_background_texture": "textures/ui/durability_tools_viewer/background",
+  "$dimz_dtv_label_background_color": [ 0, 0, 0 ],
+  "$dimz_dtv_label_background_alpha": 0.7,
+  
+  
+  ////* Item Renderer *////
+  "$dimz_dtv_item_size": [ 16, 16 ],
+  
+  ////* Notification *////
+  "$dimz_dtv_notification_on": 20, // 20%
+  "$dimz_dtv_notification_duration": 3,
+  "$dimz_dtv_notification_anims_play": "out_back",
+  "$dimz_dtv_notification_anims_end": "in_back",
+  
+  "$dimz_dtv_notification_background_texture": "textures/ui/durability_tools_viewer/background",
+  "$dimz_dtv_notification_background_size": [ "100%c + 10px", "100%c + 5px" ],
+  "$dimz_dtv_notification_background_color": [ 0, 0, 0 ],
+  "$dimz_dtv_notification_background_alpha": 0.7
+}
