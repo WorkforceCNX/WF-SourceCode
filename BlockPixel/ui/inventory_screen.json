@@ -1,9 +1,0 @@
-/*
-Code by @Dimzcraft.
-(c) Don't use any Code without permission
-*/
-{
-  "recipe_inventory_screen_content": {
-    "$is_inventory_screen": true
-  }
-}
