@@ -80,6 +80,8 @@ CASE
 CASE 
 	WHEN FORMAT(DATEPART(ISO_WEEK, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])),'00') < 3 AND MONTH(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) > 10
 	THEN CONCAT(YEAR(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date]))+1, FORMAT(DATEPART(ISO_WEEK, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])),'00'))
+    WHEN FORMAT(DATEPART(ISO_WEEK, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])),'00') > 51 AND MONTH(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) < 3
+    THEN CONCAT(YEAR(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date]))-1, FORMAT(DATEPART(ISO_WEEK, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])),'00'))
 	ELSE CONCAT(YEAR(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])), FORMAT(DATEPART(ISO_WEEK, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])),'00'))
 	END AS [Week_num],
 CASE
@@ -339,6 +341,8 @@ Select
 CASE 
 WHEN FORMAT(DATEPART(ISO_WEEK, COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])),'00') < 3 AND MONTH(COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])) > 10
 THEN CONCAT(YEAR(COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date]))+1, FORMAT(DATEPART(ISO_WEEK, COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])),'00'))
+WHEN FORMAT(DATEPART(ISO_WEEK, COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])),'00') > 51 AND MONTH(COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])) < 3
+THEN CONCAT(YEAR(COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date]))-1, FORMAT(DATEPART(ISO_WEEK, COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])),'00'))
 ELSE CONCAT(YEAR(COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])), FORMAT(DATEPART(ISO_WEEK, COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])),'00')) 
 END                                                                                        AS [Week_num],
 COALESCE(ActualRevenue.[Date],Budget.[Date],NewHire.[Date])                                AS [Date],
