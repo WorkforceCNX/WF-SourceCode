@@ -313,9 +313,9 @@ GROUP BY ROSTER_RAW3.[Date], ROSTER_RAW3.[LOB]
 Actual As (
 Select
 EPS_RAW4.[Date], ROSTER_RAW2.[LOB],
-(SUM(ISNULL(EPS_RAW4.[Ready_Talking(s)],0)) + SUM(ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0)) + SUM(ISNULL(EPS_RAW4.[RONA(s)],0)) + SUM(ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0)) +
-SUM(ISNULL(EPS_RAW4.[Payment_Processing(s)],0)) + SUM(ISNULL(EPS_RAW4.[Mass_Issue(s)],0)) + SUM(ISNULL(EPS_RAW4.[Project(s)],0)))/3600 AS [Act_Prod(H)],
-(SUM(ISNULL(EPS_RAW4.[Meeting(s)],0)) + SUM(ISNULL(EPS_RAW4.[Training(s)],0)))/3600 AS [Act_Downtime(H)]
+(SUM(ISNULL(CAST(EPS_RAW4.[Ready_Talking(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Picklist_off_Phone(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[RONA(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Unscheduled_Picklist(s)] AS DECIMAL),0)) +
+SUM(ISNULL(CAST(EPS_RAW4.[Payment_Processing(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Mass_Issue(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Project(s)] AS DECIMAL),0)))/3600 AS [Act_Prod(H)],
+(SUM(ISNULL(CAST(EPS_RAW4.[Meeting(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Training(s)] AS DECIMAL),0)))/3600 AS [Act_Downtime(H)]
 From EPS_RAW4
 LEFT JOIN ROSTER_RAW2 ON EPS_RAW4.[Date] = ROSTER_RAW2.[Date] AND EPS_RAW4.[Employee_ID] = ROSTER_RAW2.[Emp ID]
 WHERE ROSTER_RAW2.[LOB] Is Not Null And ROSTER_RAW2.[Shift] <> 'New Hire Training'
