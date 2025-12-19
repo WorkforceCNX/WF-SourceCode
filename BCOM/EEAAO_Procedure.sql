@@ -13,6 +13,7 @@ BEGIN
 --                                       V                                       V                                              --
 ----------------------------------------------------------------------------------------------------------------------------------
 */
+
 	WITH
 	-- Create GLB.OT_RAMCO 1 (RAW)
 	OTRAMCO_RAW AS (  --Setup OTRamco
@@ -288,7 +289,8 @@ BEGIN
 	EPS_RAW.[PreviousDate_Login_VN], EPS_RAW.[Time_Login_VN], EPS_RAW.[SessionLogout_VN], EPS_RAW.[Date_Logout_VN], EPS_RAW.[Time_Logout_VN], EPS_RAW.[NightTime], EPS_RAW.[DayTime], EPS_RAW.[Night_BPE], EPS_RAW.[Day_BPE] 
 	FROM EPS_RAW
 	LEFT JOIN Staff_RAW ON EPS_RAW.[Username] = Staff_RAW.[Booking Login ID] 
-	LEFT JOIN ROSTER_RAW2 ON Staff_RAW.[Employee_ID] = ROSTER_RAW2.[Emp ID] And EPS_RAW.[Date_Login_VN] = ROSTER_RAW2.[Date] ),
+	LEFT JOIN ROSTER_RAW2 ON Staff_RAW.[Employee_ID] = ROSTER_RAW2.[Emp ID] And EPS_RAW.[Date_Login_VN] = ROSTER_RAW2.[Date] 
+	),
 	-- Create BCOM.EPS 3 (Add: Final Date)
 	EPS_RAW3 AS (
 	SELECT
@@ -736,7 +738,8 @@ BEGIN
 	SELECT [Date], Staff_RAW.[Employee_ID],   
 	Sum(ISNULL(([length]*24*3600),0))                                                                                        AS [Total Ploted(s)],
 	Sum(ISNULL((Case When [Scheduled Activity] in ('Open Time','Email 1') THEN ([length]*24*3600) ELSE Null END),0))         AS [Plotted Productive(s)],
-	Sum(ISNULL((Case When [Scheduled Activity] in ('Coaching 1:1','Team Meeting') THEN ([length]*24*3600) ELSE Null END),0)) AS [Plotted Downtime(s)],
+	Sum(ISNULL((Case When [Scheduled Activity] in ('Coaching 1:1','Team Meeting',
+	  'Coaching 1:1 Offline','Training A','Training N','Training U','Training Q') THEN ([length]*24*3600) ELSE Null END),0)) AS [Plotted Downtime(s)],
 	Sum(ISNULL((Case When [Scheduled Activity] = 'Open Time' THEN ([length]*24*3600) ELSE Null END),0))                      AS [Plotted Phone(s)],
 	Sum(ISNULL((Case When [Scheduled Activity] = 'Email 1' THEN ([length]*24*3600) ELSE Null END),0))                        AS [Plotted Picklist(s)],
 	Sum(ISNULL((Case When [Scheduled Activity] = 'Break Offline' THEN ([length]*24*3600) else Null END),0))                  AS [Break_Offline Ploted(s)],
@@ -988,11 +991,11 @@ BEGIN
 	ISNULL(RONA_RAW2.[#RONA],0) AS [#RONA], ISNULL(CUIC_RAW2.[AgentAvailTime(s)],0) AS [AgentAvailTime(s)], ISNULL(CUIC_RAW2.[CUICLoggedTime(s)],0) AS [CUICLoggedTime(s)],
 	/*Productive Hour*/
 	ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +
-	ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0) AS [Productive(s)],
+	ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0) + ISNULL(EPS_RAW4.[Special_Task(s)],0) AS [Productive(s)],
 	ISNULL(EPS_RAW4.[Night_Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Night_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Night_RONA(s)],0) + ISNULL(EPS_RAW4.[Night_Unscheduled_Picklist(s)],0) +
-	ISNULL(EPS_RAW4.[Night_Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Night_Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Night_Project(s)],0) AS [Night_Productive(s)],
+	ISNULL(EPS_RAW4.[Night_Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Night_Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Night_Project(s)],0) + ISNULL(EPS_RAW4.[Night_Special_Task(s)],0) AS [Night_Productive(s)],
 	ISNULL(EPS_RAW4.[Day_Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Day_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Day_RONA(s)],0) + ISNULL(EPS_RAW4.[Day_Unscheduled_Picklist(s)],0) +
-	ISNULL(EPS_RAW4.[Day_Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Day_Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Day_Project(s)],0) AS [Day_Productive(s)],
+	ISNULL(EPS_RAW4.[Day_Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Day_Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Day_Project(s)],0) + ISNULL(EPS_RAW4.[Day_Special_Task(s)],0) AS [Day_Productive(s)],
 	/*DownTime Hour*/
 	ISNULL(EPS_RAW4.[Meeting(s)],0) + ISNULL(EPS_RAW4.[Training(s)],0) AS [Downtime(s)],
 	ISNULL(EPS_RAW4.[Night_Meeting(s)],0) + ISNULL(EPS_RAW4.[Night_Training(s)],0) AS [Night_Downtime(s)],
@@ -1363,9 +1366,9 @@ BEGIN
 	/*257 - Target*/ EEAAO_RAW.[PSAT English (American) tar],
 	/*258 - Target*/ EEAAO_RAW.[PSAT English (Great Britain) tar],
 	/*259 - Target*/ EEAAO_RAW.[CSAT Reso tar],
-	/*260 - Target*/ EEAAO_RAW.[Quality - personalization tar],
-	/*261 - Target*/ EEAAO_RAW.[Quality - proactivity tar],
-	/*262 - Target*/ EEAAO_RAW.[Quality - resolution tar],
+	/*260 - Target*/ [Quality - personalization tar],
+	/*261 - Target*/ [Quality - proactivity tar],
+	/*262 - Target*/ [Quality - resolution tar],
 	/*263 - ROSTER_RAW3*/ EEAAO_RAW.[ScheduleHours(H)],
 	/*264 - ROSTER_RAW3*/ EEAAO_RAW.[IO_Standard(H)],
 	/*265 - ROSTER_RAW3*/ EEAAO_RAW.[IO_Standard_ExcluBreak(H)],
@@ -1373,6 +1376,7 @@ BEGIN
 	/*267 - ROSTER_RAW3*/ EEAAO_RAW.[SchedUPL(H)]
 	FROM EEAAO_RAW
 	)
+
 /*                                                           
 ----------------------------------------------------------------------------------------------------------------------------------
 --                                           ^                             ^                                                    --

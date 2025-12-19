@@ -722,7 +722,8 @@ WpSummary_RAW AS (
 SELECT [Date], Staff_RAW.[Employee_ID],   
 Sum(ISNULL(([length]*24*3600),0))                                                                                        AS [Total Ploted(s)],
 Sum(ISNULL((Case When [Scheduled Activity] in ('Open Time','Email 1') THEN ([length]*24*3600) ELSE Null END),0))         AS [Plotted Productive(s)],
-Sum(ISNULL((Case When [Scheduled Activity] in ('Coaching 1:1','Team Meeting') THEN ([length]*24*3600) ELSE Null END),0)) AS [Plotted Downtime(s)],
+Sum(ISNULL((Case When [Scheduled Activity] in ('Coaching 1:1','Team Meeting',
+  'Coaching 1:1 Offline','Training A','Training N','Training U','Training Q') THEN ([length]*24*3600) ELSE Null END),0)) AS [Plotted Downtime(s)],
 Sum(ISNULL((Case When [Scheduled Activity] = 'Open Time' THEN ([length]*24*3600) ELSE Null END),0))                      AS [Plotted Phone(s)],
 Sum(ISNULL((Case When [Scheduled Activity] = 'Email 1' THEN ([length]*24*3600) ELSE Null END),0))                        AS [Plotted Picklist(s)],
 Sum(ISNULL((Case When [Scheduled Activity] = 'Break Offline' THEN ([length]*24*3600) else Null END),0))                  AS [Break_Offline Ploted(s)],
@@ -974,11 +975,11 @@ ISNULL(CPI_RAW3.[#Swiveled_email],0)+ISNULL(CPI_RAW3.[#Swiveled_Undefined],0)+IS
 ISNULL(RONA_RAW2.[#RONA],0) AS [#RONA], ISNULL(CUIC_RAW2.[AgentAvailTime(s)],0) AS [AgentAvailTime(s)], ISNULL(CUIC_RAW2.[CUICLoggedTime(s)],0) AS [CUICLoggedTime(s)],
 /*Productive Hour*/
 ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +
-ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0) AS [Productive(s)],
+ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0) + ISNULL(EPS_RAW4.[Special_Task(s)],0) AS [Productive(s)],
 ISNULL(EPS_RAW4.[Night_Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Night_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Night_RONA(s)],0) + ISNULL(EPS_RAW4.[Night_Unscheduled_Picklist(s)],0) +
-ISNULL(EPS_RAW4.[Night_Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Night_Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Night_Project(s)],0) AS [Night_Productive(s)],
+ISNULL(EPS_RAW4.[Night_Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Night_Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Night_Project(s)],0) + ISNULL(EPS_RAW4.[Night_Special_Task(s)],0) AS [Night_Productive(s)],
 ISNULL(EPS_RAW4.[Day_Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Day_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Day_RONA(s)],0) + ISNULL(EPS_RAW4.[Day_Unscheduled_Picklist(s)],0) +
-ISNULL(EPS_RAW4.[Day_Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Day_Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Day_Project(s)],0) AS [Day_Productive(s)],
+ISNULL(EPS_RAW4.[Day_Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Day_Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Day_Project(s)],0) + ISNULL(EPS_RAW4.[Day_Special_Task(s)],0) AS [Day_Productive(s)],
 /*DownTime Hour*/
 ISNULL(EPS_RAW4.[Meeting(s)],0) + ISNULL(EPS_RAW4.[Training(s)],0) AS [Downtime(s)],
 ISNULL(EPS_RAW4.[Night_Meeting(s)],0) + ISNULL(EPS_RAW4.[Night_Training(s)],0) AS [Night_Downtime(s)],
