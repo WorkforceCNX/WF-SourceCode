@@ -1,21 +1,13 @@
 ﻿WITH
 -- Create GLB.OT_RAMCO 1 (RAW)
 OTRAMCO_RAW AS (  --Setup OTRamco
-SELECT [Date], [employee_code] AS [EID], SUM([Hours]*3600) AS [OT_Ramco(s)] 
+SELECT 
+[Date], [employee_code] AS [EID], 
+SUM(CASE WHEN [OT Type] IN ('OT1.0X','OT1.5X','OT2.0X','OT2.1X','OT2.5X','OT2.7X') THEN [Hours]*3600 ELSE 0 END) AS [OT_Ramco(s)],
+SUM(CASE WHEN [OT Type] IN ('OT3.0X','OT3.9X','OT4.0X') THEN [Hours]*3600 ELSE 0 END) AS [PH_Ramco(s)],
+SUM(CASE WHEN [OT Type] = 'NSA' THEN [Hours]*3600 ELSE 0 END) AS [NSA_Ramco(s)]
 FROM GLB.OT_RAMCO
-WHERE [OT Type] in ('OT1.0X','OT1.5X','OT2.0X','OT2.1X','OT2.5X','OT2.7X') And [Hours] > 0 And [Status] In ('Pending','Authorized')
-GROUP BY [Date], [employee_code]
-),
-PHRAMCO_RAW AS (  --Setup PHRamco
-SELECT [Date], [employee_code] AS [EID], SUM([Hours]*3600) AS [PH_Ramco(s)] 
-FROM GLB.OT_RAMCO
-WHERE [OT Type] in ('OT3.0X','OT3.9X','OT4.0X') And [Hours] > 0 And [Status] In ('Pending','Authorized')
-GROUP BY [Date], [employee_code]
-),
-NSARAMCO_RAW AS (  --Setup NSARamco
-SELECT [Date], [employee_code] AS [EID], SUM([Hours]*3600) AS [NSA_Ramco(s)] 
-FROM GLB.OT_RAMCO
-WHERE [OT Type] = 'NSA' And [Hours] > 0 And [Status] In ('Pending','Authorized')
+WHERE [Status] In ('Pending','Authorized') AND [Hours] > 0
 GROUP BY [Date], [employee_code]
 ),
 -- Create GLB.RAMCO 1 (RAW)
@@ -926,7 +918,7 @@ WHEN
   ISNULL(EPS_RAW4.[Training(s)],0) + ISNULL(EPS_RAW4.[New_Hire_Training(s)],0) + ISNULL(EPS_RAW4.[Break(s)],0) + ISNULL(ExceptionReq_RAW.[Req_Second],0)) - 
 (CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PR' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW3.[Original_Shift] <> 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] + (8*3600)
       WHEN RAMCO_RAW.[Ramco_Code] = 'PO' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW3.[Original_Shift] = 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] ELSE 0 END)) END),0) AS [Approve OT(s)],
-ISNULL(OTRAMCO_RAW.[OT_Ramco(s)],0) AS [OT_Ramco(s)], ISNULL(PHRAMCO_RAW.[PH_Ramco(s)],0) AS [PH_Ramco(s)], ISNULL(NSARAMCO_RAW.[NSA_Ramco(s)],0) AS [NSA_Ramco(s)],
+ISNULL(OTRAMCO_RAW.[OT_Ramco(s)],0) AS [OT_Ramco(s)], ISNULL(OTRAMCO_RAW.[PH_Ramco(s)],0) AS [PH_Ramco(s)], ISNULL(OTRAMCO_RAW.[NSA_Ramco(s)],0) AS [NSA_Ramco(s)],
 /*Set up LoggedOutAfterShift*/
 Case When EPS_RAW4.[Logout] >  --Time should out
 (Case when RAMCO_RAW.[Ramco_Code] in ('PR','PH','PI') then   
@@ -1076,8 +1068,6 @@ LEFT JOIN LogoutCount_RAW ON ROSTER_RAW3.[Date] = LogoutCount_RAW.[Date] AND ROS
 LEFT JOIN ExceptionReq_RAW ON ROSTER_RAW3.[Date] = ExceptionReq_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = ExceptionReq_RAW.[Emp ID]
 LEFT JOIN RegisteredOT_RAW ON ROSTER_RAW3.[Date] = RegisteredOT_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = RegisteredOT_RAW.[Emp ID]
 LEFT JOIN OTRAMCO_RAW ON ROSTER_RAW3.[Date] = OTRAMCO_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = OTRAMCO_RAW.[EID]
-LEFT JOIN PHRAMCO_RAW ON ROSTER_RAW3.[Date] = PHRAMCO_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = PHRAMCO_RAW.[EID]
-LEFT JOIN NSARAMCO_RAW ON ROSTER_RAW3.[Date] = NSARAMCO_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = NSARAMCO_RAW.[EID]
 LEFT JOIN CPI_RAW3 ON ROSTER_RAW3.[Date] = CPI_RAW3.[Date] AND ROSTER_RAW3.[Emp ID] = CPI_RAW3.[Employee_ID]
 LEFT JOIN RONA_RAW2 ON ROSTER_RAW3.[Date] = RONA_RAW2.[Session Date] AND ROSTER_RAW3.[Emp ID] = RONA_RAW2.[Employee_ID]
 LEFT JOIN CUIC_RAW2 ON ROSTER_RAW3.[Date] = CUIC_RAW2.[Session Date] AND ROSTER_RAW3.[Emp ID] = CUIC_RAW2.[Employee_ID]
