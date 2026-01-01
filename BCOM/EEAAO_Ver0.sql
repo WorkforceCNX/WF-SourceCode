@@ -1,29 +1,21 @@
-﻿CREATE OR ALTER PROCEDURE BCOM.Refresh_EEAAO_Data
-AS
-BEGIN
-    SET NOCOUNT ON;
-	PRINT 'Starting procedure BCOM.Refresh_EEAAO_Data.';
-    PRINT 'Truncating table BCOM.EEAAO...';
-    TRUNCATE TABLE BCOM.EEAAO; --Clear EEAAO
-	PRINT 'Table BCOM.EEAAO truncated successfully. And start run EEAAO scrip';
-/*                                                           
-----------------------------------------------------------------------------------------------------------------------------------
---                                       |                                       |                                              --
---                                       |            IMPORT CODE HERE           |                                              --
---                                       V                                       V                                              --
-----------------------------------------------------------------------------------------------------------------------------------
-*/
-
-WITH
+﻿WITH
 -- Create GLB.OT_RAMCO 1 (RAW)
 OTRAMCO_RAW AS (  --Setup OTRamco
-SELECT 
-[Date], [employee_code] AS [EID], 
-SUM(CASE WHEN [OT Type] IN ('OT1.0X','OT1.5X','OT2.0X','OT2.1X','OT2.5X','OT2.7X') THEN [Hours]*3600 ELSE 0 END) AS [OT_Ramco(s)],
-SUM(CASE WHEN [OT Type] IN ('OT3.0X','OT3.9X','OT4.0X') THEN [Hours]*3600 ELSE 0 END) AS [PH_Ramco(s)],
-SUM(CASE WHEN [OT Type] = 'NSA' THEN [Hours]*3600 ELSE 0 END) AS [NSA_Ramco(s)]
+SELECT [Date], [employee_code] AS [EID], SUM([Hours]*3600) AS [OT_Ramco(s)] 
 FROM GLB.OT_RAMCO
-WHERE [Status] In ('Pending','Authorized') AND [Hours] > 0
+WHERE [OT Type] in ('OT1.0X','OT1.5X','OT2.0X','OT2.1X','OT2.5X','OT2.7X') And [Hours] > 0 And [Status] In ('Pending','Authorized')
+GROUP BY [Date], [employee_code]
+),
+PHRAMCO_RAW AS (  --Setup PHRamco
+SELECT [Date], [employee_code] AS [EID], SUM([Hours]*3600) AS [PH_Ramco(s)] 
+FROM GLB.OT_RAMCO
+WHERE [OT Type] in ('OT3.0X','OT3.9X','OT4.0X') And [Hours] > 0 And [Status] In ('Pending','Authorized')
+GROUP BY [Date], [employee_code]
+),
+NSARAMCO_RAW AS (  --Setup NSARamco
+SELECT [Date], [employee_code] AS [EID], SUM([Hours]*3600) AS [NSA_Ramco(s)] 
+FROM GLB.OT_RAMCO
+WHERE [OT Type] = 'NSA' And [Hours] > 0 And [Status] In ('Pending','Authorized')
 GROUP BY [Date], [employee_code]
 ),
 -- Create GLB.RAMCO 1 (RAW)
@@ -75,14 +67,11 @@ FROM GLB.RAMCO
 -- Create GLB.PremHdays 1 (RAW)
 PremHday_RAW AS ( SELECT [Date],[Holiday] FROM GLB.PremHdays 
 ),
--- Create BCOM.SCHEDULE
-ROSTER_RAW AS ( SELECT [Shift], [Shift_type], [Original_Shift], [LOB], [week_shift], [week_off], [TL_ID], [TL_Name], [OM_ID], [OM_Name], [DPE_ID], [DPE_Name], 
-                       [Emp ID], [Emp_Name], [Wave], [Booking Login ID], [TED Name], [cnx_email], [Booking Email], [CUIC Name], [PST_Start_Date], [Date], [Tenure], 
-                       [Tenure days], [Week_num], [Shift_definition], [YEAR], [MONTH], [Week_day], [Termination/Transfer], [LOB Group], [ScheduleSeconds(s)], [Work Type] 
-                FROM BCOM.Schedule WHERE [Date] >= '2024-01-01'
+-- Create BCOM.ROSTER 1 (RAW)
+ROSTER_RAW AS ( SELECT [Emp ID], [Attribute], [Value], [LOB], [team_leader], [week_shift], [week_off], [OM], [DPE], [Work Type] FROM BCOM.ROSTER WHERE [Attribute] >= '2023-01-01'
 ),
--- Create Schedule(n-1) 1 (RAW)
-ROSTER_Pre1_RAW AS ( SELECT [Emp ID], [Date] AS [Date-1], [Shift], [LOB], [TL_Name], [week_shift], [Shift_type], [week_off], [OM_Name], [DPE_Name], [Work Type] FROM BCOM.Schedule WHERE [Date] >= '2024-01-01'
+-- Create ROSTER(n-1) 1 (RAW)
+ROSTER_Pre1_RAW AS ( SELECT [Emp ID], [Attribute] AS [Date-1], [Value], [LOB], [team_leader], [week_shift], [week_off], [OM], [DPE], [Work Type] FROM BCOM.ROSTER WHERE [Attribute] >= '2023-01-01'
 ),
 -- Create BCOM.LTTransfers 1 (RAW)
 TRANSFER_RAW AS (      
@@ -151,26 +140,152 @@ SELECT
 From BCOM.PSAT
 LEFT JOIN Staff_RAW ON [Staff Name] = Staff_RAW.[TED Name]
 ),
+-- Create BCOM.ROSTER 2 (Add: Shift)
+ROSTER_RAW2 AS (
+SELECT
+	ROSTER_RAW.[Emp ID], ROSTER_RAW.[Attribute] AS [Date], 
+	ROSTER_RAW.[Value] AS [Original_Shift], ROSTER_RAW.[LOB], ROSTER_RAW.[team_leader], ROSTER_RAW.[week_shift], 
+	ROSTER_RAW.[week_off], ROSTER_RAW.[OM], ROSTER_RAW.[DPE],
+	CASE WHEN RAMCO_RAW.[Ramco_Code] IN ('PH', 'PO') THEN ROSTER_RAW.[week_shift] ELSE ROSTER_RAW.[Value] END AS [Shift],
+	CASE 
+			WHEN (CASE WHEN RAMCO_RAW.[Ramco_Code] IN ('PH', 'PO') THEN ROSTER_RAW.[week_shift] ELSE ROSTER_RAW.[Value] END) IN ('OFF', 'AL', 'CO', 'HO', 'UPL', 'VGH') THEN 'OFF'
+			WHEN (CASE WHEN RAMCO_RAW.[Ramco_Code] IN ('PH', 'PO') THEN ROSTER_RAW.[week_shift] ELSE ROSTER_RAW.[Value] END) IN ('Training', 'PEGA') THEN 'Training'
+			WHEN (CASE WHEN RAMCO_RAW.[Ramco_Code] IN ('PH', 'PO') THEN ROSTER_RAW.[week_shift] ELSE ROSTER_RAW.[Value] END) IN (
+			'0000-0900', '0100-1000', '0200-1100', '0300-1200', '0400-1300', '0500-1400', '0600-1500', '0700-1600', '0800-1700', '0900-1800', '1000-1900', '1100-2000', '1200-2100', '1300-2200', '1400-2300', --Original Fulltime shift
+			'0000-0400', '0700-1100', '1000-1500', '1100-1500', '1100-1700', '1200-1500', '1200-1600', '1200-1700', '1200-1800', '1200-1900','1200-2000', '1200-2200', '1300-1500', '1300-1600', '1300-1700', '1300-1800', '1300-1900', '1300-2000', '1300-2100', --Stupid parttime shift
+			'1300-2300', '1330-1800', '1400-1600', '1400-1700', '1400-1800', '1400-1900', '1400-2000', '1400-2100', '1400-2200','1500-1900', '1500-2000', '1500-2100', '1500-2200', '1500-2300', '1600-2000', '1600-2100', '1600-2200', '1600-2300', '1700-2100',
+			'1700-2200', '1700-2300', '1800-2100', '1800-2200', '1800-2300', '1900-2300') THEN 'DS'
+			WHEN (CASE WHEN RAMCO_RAW.[Ramco_Code] IN ('PH', 'PO') THEN ROSTER_RAW.[week_shift] ELSE ROSTER_RAW.[Value] END) IN (
+			'1500-0000', '1600-0100', '1700-0200', '1800-0300', '1900-0400', '2000-0500', '2100-0600', '2200-0700', '2300-0800', --Original Fulltime shift
+			'1200-0000','1400-0400','1600-0000','1700-0000','1800-0000','1800-0000','1900-0000','1900-0100','1900-0200','2000-0000','2000-0400','2200-0200','2200-0400','2200-0700','2300-0300','2300-0400' --Stupid parttime shift
+			) THEN 'NS'
+			WHEN ROSTER_RAW.[week_shift] IN (
+			'0000-0900', '0100-1000', '0200-1100', '0300-1200', '0400-1300', '0500-1400', '0600-1500', '0700-1600', '0800-1700', '0900-1800', '1000-1900', '1100-2000', '1200-2100', '1300-2200', '1400-2300', --Original Fulltime shift
+			'0000-0400', '0700-1100', '1000-1500', '1100-1500', '1100-1700', '1200-1500', '1200-1600', '1200-1700', '1200-1800', '1200-1900','1200-2000', '1200-2200', '1300-1500', '1300-1600', '1300-1700', '1300-1800', '1300-1900', '1300-2000', '1300-2100', --Stupid parttime shift
+			'1300-2300', '1330-1800', '1400-1600', '1400-1700', '1400-1800', '1400-1900', '1400-2000', '1400-2100', '1400-2200','1500-1900', '1500-2000', '1500-2100', '1500-2200', '1500-2300', '1600-2000', '1600-2100', '1600-2200', '1600-2300', '1700-2100',
+			'1700-2200', '1700-2300', '1800-2100', '1800-2200', '1800-2300', '1900-2300') THEN 'DS'
+			WHEN ROSTER_RAW.[week_shift] IN (
+			'1500-0000', '1600-0100', '1700-0200', '1800-0300', '1900-0400', '2000-0500', '2100-0600', '2200-0700', '2300-0800', --Original Fulltime shift
+			'1200-0000','1400-0400','1600-0000','1700-0000','1800-0000','1800-0000','1900-0000','1900-0100','1900-0200','2000-0000','2000-0400','2200-0200','2200-0400','2200-0700','2300-0300','2300-0400' --Stupid parttime shift
+			) THEN 'NS'
+			ELSE Null END AS [Shift_type], ROSTER_RAW.[Work Type]
+FROM ROSTER_RAW
+LEFT JOIN RAMCO_RAW ON ROSTER_RAW.[Emp ID] = RAMCO_RAW.[EID] AND ROSTER_RAW.[Attribute] = RAMCO_RAW.[Date] 
+),
+-- Create ROSTER_Pre1_RAW 2 (Add: Shift_type)
+ROSTER_Pre1_RAW2 AS (
+SELECT
+	ROSTER_Pre1_RAW.[Emp ID], ROSTER_Pre1_RAW.[Date-1], 
+	ROSTER_Pre1_RAW.[Value] AS [Original_Shift], ROSTER_Pre1_RAW.[LOB], ROSTER_Pre1_RAW.[team_leader], ROSTER_Pre1_RAW.[week_shift], 
+	ROSTER_Pre1_RAW.[week_off], ROSTER_Pre1_RAW.[OM], ROSTER_Pre1_RAW.[DPE],
+	CASE WHEN RAMCO_RAW.[Ramco_Code] IN ('PH', 'PO') THEN ROSTER_Pre1_RAW.[week_shift] ELSE ROSTER_Pre1_RAW.[Value] END AS [Shift],
+	CASE 
+			WHEN (CASE WHEN RAMCO_RAW.[Ramco_Code] IN ('PH', 'PO') THEN ROSTER_Pre1_RAW.[week_shift] ELSE ROSTER_Pre1_RAW.[Value] END) IN ('OFF', 'AL', 'CO', 'HO', 'UPL', 'VGH') THEN 'OFF'
+			WHEN (CASE WHEN RAMCO_RAW.[Ramco_Code] IN ('PH', 'PO') THEN ROSTER_Pre1_RAW.[week_shift] ELSE ROSTER_Pre1_RAW.[Value] END) IN ('Training', 'PEGA') THEN 'Training'
+			WHEN (CASE WHEN RAMCO_RAW.[Ramco_Code] IN ('PH', 'PO') THEN ROSTER_Pre1_RAW.[week_shift] ELSE ROSTER_Pre1_RAW.[Value] END) IN (
+			'0000-0900', '0100-1000', '0200-1100', '0300-1200', '0400-1300', '0500-1400', '0600-1500', '0700-1600', '0800-1700', '0900-1800', '1000-1900', '1100-2000', '1200-2100', '1300-2200', '1400-2300', --Original Fulltime shift
+			'0000-0400', '0700-1100', '1000-1500', '1100-1500', '1100-1700', '1200-1500', '1200-1600', '1200-1700', '1200-1800', '1200-1900','1200-2000', '1200-2200', '1300-1500', '1300-1600', '1300-1700', '1300-1800', '1300-1900', '1300-2000', '1300-2100', --Stupid parttime shift
+			'1300-2300', '1330-1800', '1400-1600', '1400-1700', '1400-1800', '1400-1900', '1400-2000', '1400-2100', '1400-2200','1500-1900', '1500-2000', '1500-2100', '1500-2200', '1500-2300', '1600-2000', '1600-2100', '1600-2200', '1600-2300', '1700-2100',
+			'1700-2200', '1700-2300', '1800-2100', '1800-2200', '1800-2300', '1900-2300') THEN 'DS'
+			WHEN (CASE WHEN RAMCO_RAW.[Ramco_Code] IN ('PH', 'PO') THEN ROSTER_Pre1_RAW.[week_shift] ELSE ROSTER_Pre1_RAW.[Value] END) IN (
+			'1500-0000', '1600-0100', '1700-0200', '1800-0300', '1900-0400', '2000-0500', '2100-0600', '2200-0700', '2300-0800', --Original Fulltime shift
+			'1200-0000','1400-0400','1600-0000','1700-0000','1800-0000','1800-0000','1900-0000','1900-0100','1900-0200','2000-0000','2000-0400','2200-0200','2200-0400','2200-0700','2300-0300','2300-0400' --Stupid parttime shift
+			) THEN 'NS'
+			WHEN ROSTER_Pre1_RAW.[week_shift] IN (
+			'0000-0900', '0100-1000', '0200-1100', '0300-1200', '0400-1300', '0500-1400', '0600-1500', '0700-1600', '0800-1700', '0900-1800', '1000-1900', '1100-2000', '1200-2100', '1300-2200', '1400-2300', --Original Fulltime shift
+			'0000-0400', '0700-1100', '1000-1500', '1100-1500', '1100-1700', '1200-1500', '1200-1600', '1200-1700', '1200-1800', '1200-1900','1200-2000', '1200-2200', '1300-1500', '1300-1600', '1300-1700', '1300-1800', '1300-1900', '1300-2000', '1300-2100', --Stupid parttime shift
+			'1300-2300', '1330-1800', '1400-1600', '1400-1700', '1400-1800', '1400-1900', '1400-2000', '1400-2100', '1400-2200','1500-1900', '1500-2000', '1500-2100', '1500-2200', '1500-2300', '1600-2000', '1600-2100', '1600-2200', '1600-2300', '1700-2100',
+			'1700-2200', '1700-2300', '1800-2100', '1800-2200', '1800-2300', '1900-2300') THEN 'DS'
+			WHEN ROSTER_Pre1_RAW.[week_shift] IN (
+			'1500-0000', '1600-0100', '1700-0200', '1800-0300', '1900-0400', '2000-0500', '2100-0600', '2200-0700', '2300-0800', --Original Fulltime shift
+			'1200-0000','1400-0400','1600-0000','1700-0000','1800-0000','1800-0000','1900-0000','1900-0100','1900-0200','2000-0000','2000-0400','2200-0200','2200-0400','2200-0700','2300-0300','2300-0400' --Stupid parttime shift
+			) THEN 'NS'
+			ELSE Null END AS [Shift_type], ROSTER_Pre1_RAW.[Work Type]
+FROM ROSTER_Pre1_RAW
+LEFT JOIN RAMCO_RAW ON ROSTER_Pre1_RAW.[Emp ID] = RAMCO_RAW.[EID] AND ROSTER_Pre1_RAW.[Date-1] = RAMCO_RAW.[Date] 
+),
+-- Create BCOM.ROSTER 3 (Add: [Termination/Transfer])
+ROSTER_RAW3 AS (
+SELECT
+ROSTER_RAW2.[Shift], ROSTER_RAW2.[Shift_type], ROSTER_RAW2.[Original_Shift], ROSTER_RAW2.[LOB], ROSTER_RAW2.[week_shift], ROSTER_RAW2.[week_off], 
+ROSTER_RAW2.[team_leader] AS [TL_ID], TL_RAW.[TL_Name], ROSTER_RAW2.[OM] AS [OM_ID], OM_RAW.[OM_Name], ROSTER_RAW2.[DPE] AS [DPE_ID], DPE_RAW.[DPE_Name],
+COALESCE(ROSTER_RAW2.[Emp ID], TRANSFER_RAW.[EID], TERMINATION_RAW.[EMPLOYEE_ID], RESIGNATION_RAW.[Employee ID]) AS [Emp ID], Staff_RAW.[Full name] AS [Emp_Name], 
+Staff_RAW.[Wave #] AS [Wave], Staff_RAW.[Booking Login ID], Staff_RAW.[TED Name], Staff_RAW.[cnx_email], Staff_RAW.[Booking Email], Staff_RAW.[CUIC Name], Staff_RAW.[PST_Start_Date],
+COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date]) AS [Date],
+CASE 
+	WHEN DATEDIFF(day, Staff_RAW.[PST_Start_Date], COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) >= 90 THEN 'TN'
+	WHEN Staff_RAW.[PST_Start_Date] IS NULL THEN 'Undefined' 
+	ELSE 'NH' END AS [Tenure],
+CASE 
+	WHEN DATEDIFF(DAY, Staff_RAW.[PST_Start_Date], COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) <= 30 THEN '00-30'
+	WHEN DATEDIFF(DAY, Staff_RAW.[PST_Start_Date], COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) <= 60 THEN '31-60'
+	WHEN DATEDIFF(DAY, Staff_RAW.[PST_Start_Date], COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) <= 90 THEN '61-90'
+	WHEN DATEDIFF(DAY, Staff_RAW.[PST_Start_Date], COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) <= 120 THEN '91-120'
+	WHEN DATEDIFF(DAY, Staff_RAW.[PST_Start_Date], COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) > 120 THEN '120+'
+	WHEN Staff_RAW.[PST_Start_Date] IS NULL THEN 'Undefined'
+	ELSE 'Undefined' END AS [Tenure days],
+CASE 
+	WHEN FORMAT(DATEPART(ISO_WEEK, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])),'00') < 3 AND MONTH(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) > 10
+	THEN CONCAT(YEAR(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date]))+1, FORMAT(DATEPART(ISO_WEEK, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])),'00'))
+	ELSE CONCAT(YEAR(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])), FORMAT(DATEPART(ISO_WEEK, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])),'00'))
+	END AS [Week_num],
+CASE
+WHEN ROSTER_RAW2.[Shift] IN (
+'0000-0900','0100-1000','0200-1100','0300-1200','0400-1300','0500-1400','0600-1500','0700-1600','0800-1700','0900-1800','1000-1900','1100-2000',
+'1200-2100','1300-2200','1400-2300','1500-0000','1600-0100','1700-0200','1800-0300','1900-0400','2000-0500','2100-0600','2200-0700','2300-0800'
+,'HAL','Training','DOWNTIME','PEGA','New Hire Training'
+) THEN 'WORK'
+WHEN ROSTER_RAW2.[Shift] IN ('AL', 'CO', 'VGH','HO') THEN 'Planned leave'
+WHEN ROSTER_RAW2.[Shift] IN ('UPL') THEN 'Unplanned leave'
+WHEN ROSTER_RAW2.[Shift] IN ('OFF') THEN 'OFF'
+ELSE NULL END AS [Shift_definition],
+YEAR(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) AS [YEAR],
+MONTH(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) AS [MONTH],
+DATENAME(weekday, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) AS [Week_day],
+COALESCE(TRANSFER_RAW.[Remarks], TERMINATION_RAW.[Termination Reason], RESIGNATION_RAW.[Resignation Primary Reason]) AS [Termination/Transfer],
+CASE 
+	WHEN ROSTER_RAW2.[LOB] IN ('NL', 'ID4', 'HE4', 'XT4', 'EL', 'TR', 'KO', 'IT', 'CS', 'HU', 'FR', 'ZH', 'RU', 'PL', 'PT', 'NO', 'DA', 'DE', 'RO', 'BG', 'VI TRA') THEN 'Unbabel'
+	WHEN ROSTER_RAW2.[LOB] IN ('FR CSP', 'ES CSP', 'IT CSP', 'DE CSP') THEN 'Unbabel CSP'
+	WHEN ROSTER_RAW2.[LOB] = 'EN' THEN 'English'
+	WHEN ROSTER_RAW2.[LOB] = 'VICSP' THEN 'Vietnamese CSP'
+	WHEN ROSTER_RAW2.[LOB] = 'VICSG' THEN 'Vietnamese CSG'
+	WHEN ROSTER_RAW2.[LOB] = 'Senior VICSP' THEN 'Senior VICSP'
+	ELSE 'Undefined' END AS [LOB Group],
+-- Set up ScheduleSeconds(s)
+CASE
+	WHEN CHARINDEX('-', ROSTER_RAW2.[Original_Shift]) = 5 OR ROSTER_RAW2.[Original_Shift] IN ('UPL', 'PEGA') THEN 7.5 * 3600
+	WHEN ROSTER_RAW2.[Original_Shift] IN ('HAL', 'HSL') THEN 3.75 * 3600
+	ELSE 0
+END AS [ScheduleSeconds(s)], ROSTER_RAW2.[Work Type]
+FROM ROSTER_RAW2
+FULL JOIN TRANSFER_RAW ON ROSTER_RAW2.[Emp ID] = TRANSFER_RAW.[EID] And ROSTER_RAW2.[Date] = TRANSFER_RAW.[LWD]
+FULL JOIN TERMINATION_RAW ON ROSTER_RAW2.[Emp ID] = TERMINATION_RAW.[EMPLOYEE_ID] And ROSTER_RAW2.[Date] = TERMINATION_RAW.[LWD]
+FULL JOIN RESIGNATION_RAW ON ROSTER_RAW2.[Emp ID] = RESIGNATION_RAW.[Employee ID] And ROSTER_RAW2.[Date] = RESIGNATION_RAW.[Proposed Termination Date]
+LEFT JOIN TL_RAW ON ROSTER_RAW2.[team_leader] = TL_RAW.[Employee_ID]
+LEFT JOIN OM_RAW ON ROSTER_RAW2.[OM] = OM_RAW.[Employee_ID]
+LEFT JOIN DPE_RAW ON ROSTER_RAW2.[DPE] = DPE_RAW.[Employee_ID]
+LEFT JOIN Staff_RAW ON COALESCE(ROSTER_RAW2.[Emp ID], TRANSFER_RAW.[EID], TERMINATION_RAW.[EMPLOYEE_ID], RESIGNATION_RAW.[Employee ID]) = Staff_RAW.[Employee_ID]
+),
 -- Create BCOM.EPS 2 (Add: Shift)
 EPS_RAW2 AS ( 
 SELECT 
-ROSTER_RAW.[Shift], ROSTER_RAW.[Shift_type], Staff_RAW.[Employee_ID], EPS_RAW.[Username], EPS_RAW.[Session Login], EPS_RAW.[Session Logout], EPS_RAW.[Session Time], EPS_RAW.[BPE Code], EPS_RAW.[Total Time], EPS_RAW.[SessionLogin_VN], EPS_RAW.[Date_Login_VN], 
+ROSTER_RAW2.[Shift], ROSTER_RAW2.[Shift_type], Staff_RAW.[Employee_ID], EPS_RAW.[Username], EPS_RAW.[Session Login], EPS_RAW.[Session Logout], EPS_RAW.[Session Time], EPS_RAW.[BPE Code], EPS_RAW.[Total Time], EPS_RAW.[SessionLogin_VN], EPS_RAW.[Date_Login_VN], 
 EPS_RAW.[PreviousDate_Login_VN], EPS_RAW.[Time_Login_VN], EPS_RAW.[SessionLogout_VN], EPS_RAW.[Date_Logout_VN], EPS_RAW.[Time_Logout_VN], EPS_RAW.[NightTime], EPS_RAW.[DayTime], EPS_RAW.[Night_BPE], EPS_RAW.[Day_BPE] 
 FROM EPS_RAW
 LEFT JOIN Staff_RAW ON EPS_RAW.[Username] = Staff_RAW.[Booking Login ID] 
-LEFT JOIN ROSTER_RAW ON Staff_RAW.[Employee_ID] = ROSTER_RAW.[Emp ID] And EPS_RAW.[Date_Login_VN] = ROSTER_RAW.[Date] 
+LEFT JOIN ROSTER_RAW2 ON Staff_RAW.[Employee_ID] = ROSTER_RAW2.[Emp ID] And EPS_RAW.[Date_Login_VN] = ROSTER_RAW2.[Date] 
 ),
 -- Create BCOM.EPS 3 (Add: Final Date)
 EPS_RAW3 AS (
 SELECT
-EPS_RAW2.[Shift], EPS_RAW2.[Shift_type], ROSTER_RAW.[Shift] AS [Shift-1], ROSTER_RAW.[Shift_type] AS [Shifttype-1],
+EPS_RAW2.[Shift], EPS_RAW2.[Shift_type], ROSTER_RAW2.[Shift] AS [Shift-1], ROSTER_RAW2.[Shift_type] AS [Shifttype-1],
 --Set final date---------------------------------------
 CASE 
 WHEN (EPS_RAW2.[Shift_type] IS NULL OR EPS_RAW2.[Shift_type] <> 'DS') -- Today shift type not Null and <> DS
-AND ROSTER_RAW.[Shift_type] = 'NS' -- Yesterday is NS
+AND ROSTER_RAW2.[Shift_type] = 'NS' -- Yesterday is NS
 AND EPS_RAW2.[Time_Login_VN] < '12:00:00' -- Get all record < 12H to yesterday session
 THEN EPS_RAW2.[PreviousDate_Login_VN] 
-WHEN ROSTER_RAW.[Shift] In ('1100-2000', '1200-2100', '1300-2200', '1400-2300') -- Yesterday Shift in...
+WHEN ROSTER_RAW2.[Shift] In ('1100-2000', '1200-2100', '1300-2200', '1400-2300') -- Yesterday Shift in...
 AND ISNULL(RegisteredOT_RAW.[OT_Registered(s)],0) > 0 -- and agent also do OT
 AND EPS_RAW2.[Time_Login_VN] < '5:00:00' -- Get all record < 5h to yesterday session
 THEN EPS_RAW2.[PreviousDate_Login_VN] 
@@ -180,7 +295,7 @@ EPS_RAW2.[Employee_ID], EPS_RAW2.[Username], EPS_RAW2.[Session Login], EPS_RAW2.
 EPS_RAW2.[Total Time], EPS_RAW2.[SessionLogin_VN], EPS_RAW2.[Date_Login_VN], EPS_RAW2.[PreviousDate_Login_VN], EPS_RAW2.[Time_Login_VN], EPS_RAW2.[SessionLogout_VN], 
 EPS_RAW2.[Date_Logout_VN], EPS_RAW2.[Time_Logout_VN], EPS_RAW2.[NightTime], EPS_RAW2.[DayTime], EPS_RAW2.[Night_BPE], EPS_RAW2.[Day_BPE] 
 FROM EPS_RAW2
-LEFT JOIN ROSTER_RAW ON EPS_RAW2.[Employee_ID] = ROSTER_RAW.[Emp ID] And EPS_RAW2.[PreviousDate_Login_VN] = ROSTER_RAW.[Date]
+LEFT JOIN ROSTER_RAW2 ON EPS_RAW2.[Employee_ID] = ROSTER_RAW2.[Emp ID] And EPS_RAW2.[PreviousDate_Login_VN] = ROSTER_RAW2.[Date]
 LEFT JOIN RegisteredOT_RAW ON EPS_RAW2.[Employee_ID] = RegisteredOT_RAW.[Emp ID] AND EPS_RAW2.[PreviousDate_Login_VN] = RegisteredOT_RAW.[Date]
 ),
 -- Create BCOM.EPS 4 (Add: Data's Pivoted)
@@ -370,138 +485,138 @@ CSAT_CMB_RAW.[Date], CSAT_CMB_RAW.[Employee_ID],
 /*Set up Phone_CSAT_TP*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND [Channel] = 'phone' AND [Type] = 'touchpoint'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END) 
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END) 
 ELSE 0 END) as [Phone_CSAT_TP],
 /*Set up Phone_Survey_TP*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND [Channel] = 'phone' AND [Type] = 'touchpoint'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END)  
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END)  
 ELSE 0 END) AS [Phone_Survey_TP],
 /*Set up NonPhone_CSAT_TP*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND [Channel] <> 'phone' AND [Type] = 'touchpoint'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END) 
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END) 
 ELSE 0 END) as [NonPhone_CSAT_TP],
 /*Set up NonPhone_Survey_TP*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND [Channel] <> 'phone' AND [Type] = 'touchpoint'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END)  
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END)  
 ELSE 0 END) AS [NonPhone_Survey_TP],
 /*Set up Phone_CSAT_RS*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND [Channel] = 'phone' AND [Type] = 'resolution'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END) 
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END) 
 ELSE 0 END) as [Phone_CSAT_RS],
 /*Set up Phone_Survey_RS*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND [Channel] = 'phone' AND [Type] = 'resolution'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END)  
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END)  
 ELSE 0 END) AS [Phone_Survey_RS],
 /*Set up NonPhone_CSAT_RS*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND [Channel] <> 'phone' AND [Type] = 'resolution'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END) 
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END) 
 ELSE 0 END) as [NonPhone_CSAT_RS],
 /*Set up NonPhone_Survey_RS*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND [Channel] <> 'phone' AND [Type] = 'resolution'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END)  
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END)  
 ELSE 0 END) AS [NonPhone_Survey_RS],
 /*Set up Phone_CSAT*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND [Channel] = 'phone'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END) 
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END) 
 ELSE 0 END) as [Phone_CSAT],
 /*Set up Phone_Survey*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND [Channel] = 'phone'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END)  
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END)  
 ELSE 0 END) AS [Phone_Survey],
 /*Set up NonPhone_CSAT*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND [Channel] <> 'phone'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END) 
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END) 
 ELSE 0 END) as [NonPhone_CSAT],
 /*Set up NonPhone_Survey*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND [Channel] <> 'phone'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END)  
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END)  
 ELSE 0 END) AS [NonPhone_Survey],
 /*Set up Csat_Score*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT'
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END) 
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END) 
 ELSE 0 END) AS [Csat Score],
 /*Set up Csat_Survey*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' 
 THEN (CASE WHEN (ROSTER_RAW.[LOB] <> 'VICSG' OR ROSTER_RAW.[LOB] IS NULL) THEN 1 
-           ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
-      END)  
+			ELSE (Case when CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1 ELSE 0 END) 
+		END)  
 ELSE 0 END) AS [Csat Survey],
 /*Set up Csat_Score(UB)*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND CSAT_CMB_RAW.[Type] <> 'touchpoint'
 THEN (CASE WHEN ROSTER_RAW.[LOB] = 'NL' AND CSAT_CMB_RAW.[Language] = 'Dutch' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'PT' AND CSAT_CMB_RAW.[Language] In ('Portuguese','Portuguese (Brazil)') THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'IT' AND CSAT_CMB_RAW.[Language] = 'Italian' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'FR' AND CSAT_CMB_RAW.[Language] = 'French' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'NO' AND CSAT_CMB_RAW.[Language] = 'Norwegian' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'TR' AND CSAT_CMB_RAW.[Language] = 'Turkish' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'DE' AND CSAT_CMB_RAW.[Language] = 'German' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'DA' AND CSAT_CMB_RAW.[Language] = 'Danish' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'RO' AND CSAT_CMB_RAW.[Language] = 'Romanian' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'PL' AND CSAT_CMB_RAW.[Language] = 'Polish' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'CS' AND CSAT_CMB_RAW.[Language] = 'Czech' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'KO' AND CSAT_CMB_RAW.[Language] = 'Korean' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'ZH' AND CSAT_CMB_RAW.[Language] = 'Chinese' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'XT4' AND CSAT_CMB_RAW.[Language] = 'Chinese (traditional)' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'HU' AND CSAT_CMB_RAW.[Language] = 'Hungarian' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'HE4' AND CSAT_CMB_RAW.[Language] = 'Hebrew' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'ID4' AND CSAT_CMB_RAW.[Language] = 'Indonesian' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'RU' AND CSAT_CMB_RAW.[Language] = 'Russian' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'EL' AND CSAT_CMB_RAW.[Language] = 'Greek' THEN 1
-		   WHEN ROSTER_RAW.[LOB] = 'BG' AND CSAT_CMB_RAW.[Language] = 'Bulgarian' THEN 1
-		   WHEN ROSTER_RAW.[LOB] = 'VI TRA' AND CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1
-           ELSE 0 
-      END) 
+			WHEN ROSTER_RAW.[LOB] = 'PT' AND CSAT_CMB_RAW.[Language] In ('Portuguese','Portuguese (Brazil)') THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'IT' AND CSAT_CMB_RAW.[Language] = 'Italian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'FR' AND CSAT_CMB_RAW.[Language] = 'French' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'NO' AND CSAT_CMB_RAW.[Language] = 'Norwegian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'TR' AND CSAT_CMB_RAW.[Language] = 'Turkish' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'DE' AND CSAT_CMB_RAW.[Language] = 'German' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'DA' AND CSAT_CMB_RAW.[Language] = 'Danish' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'RO' AND CSAT_CMB_RAW.[Language] = 'Romanian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'PL' AND CSAT_CMB_RAW.[Language] = 'Polish' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'CS' AND CSAT_CMB_RAW.[Language] = 'Czech' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'KO' AND CSAT_CMB_RAW.[Language] = 'Korean' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'ZH' AND CSAT_CMB_RAW.[Language] = 'Chinese' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'XT4' AND CSAT_CMB_RAW.[Language] = 'Chinese (traditional)' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'HU' AND CSAT_CMB_RAW.[Language] = 'Hungarian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'HE4' AND CSAT_CMB_RAW.[Language] = 'Hebrew' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'ID4' AND CSAT_CMB_RAW.[Language] = 'Indonesian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'RU' AND CSAT_CMB_RAW.[Language] = 'Russian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'EL' AND CSAT_CMB_RAW.[Language] = 'Greek' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'BG' AND CSAT_CMB_RAW.[Language] = 'Bulgarian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'VI TRA' AND CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1
+			ELSE 0 
+		END) 
 ELSE 0 END) AS [Csat Score(UB)],
 /*Set up Csat_survey(UB)*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND CSAT_CMB_RAW.[Type] <> 'touchpoint'
 THEN (CASE WHEN ROSTER_RAW.[LOB] = 'NL' AND CSAT_CMB_RAW.[Language] = 'Dutch' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'PT' AND CSAT_CMB_RAW.[Language] In ('Portuguese','Portuguese (Brazil)') THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'IT' AND CSAT_CMB_RAW.[Language] = 'Italian' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'FR' AND CSAT_CMB_RAW.[Language] = 'French' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'NO' AND CSAT_CMB_RAW.[Language] = 'Norwegian' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'TR' AND CSAT_CMB_RAW.[Language] = 'Turkish' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'DE' AND CSAT_CMB_RAW.[Language] = 'German' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'DA' AND CSAT_CMB_RAW.[Language] = 'Danish' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'RO' AND CSAT_CMB_RAW.[Language] = 'Romanian' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'PL' AND CSAT_CMB_RAW.[Language] = 'Polish' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'CS' AND CSAT_CMB_RAW.[Language] = 'Czech' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'KO' AND CSAT_CMB_RAW.[Language] = 'Korean' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'ZH' AND CSAT_CMB_RAW.[Language] = 'Chinese' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'XT4' AND CSAT_CMB_RAW.[Language] = 'Chinese (traditional)' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'HU' AND CSAT_CMB_RAW.[Language] = 'Hungarian' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'HE4' AND CSAT_CMB_RAW.[Language] = 'Hebrew' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'ID4' AND CSAT_CMB_RAW.[Language] = 'Indonesian' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'RU' AND CSAT_CMB_RAW.[Language] = 'Russian' THEN 1
-           WHEN ROSTER_RAW.[LOB] = 'EL' AND CSAT_CMB_RAW.[Language] = 'Greek' THEN 1
-		   WHEN ROSTER_RAW.[LOB] = 'BG' AND CSAT_CMB_RAW.[Language] = 'Bulgarian' THEN 1
-		   WHEN ROSTER_RAW.[LOB] = 'VI TRA' AND CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1
-           ELSE 0 
-      END) 
+			WHEN ROSTER_RAW.[LOB] = 'PT' AND CSAT_CMB_RAW.[Language] In ('Portuguese','Portuguese (Brazil)') THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'IT' AND CSAT_CMB_RAW.[Language] = 'Italian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'FR' AND CSAT_CMB_RAW.[Language] = 'French' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'NO' AND CSAT_CMB_RAW.[Language] = 'Norwegian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'TR' AND CSAT_CMB_RAW.[Language] = 'Turkish' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'DE' AND CSAT_CMB_RAW.[Language] = 'German' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'DA' AND CSAT_CMB_RAW.[Language] = 'Danish' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'RO' AND CSAT_CMB_RAW.[Language] = 'Romanian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'PL' AND CSAT_CMB_RAW.[Language] = 'Polish' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'CS' AND CSAT_CMB_RAW.[Language] = 'Czech' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'KO' AND CSAT_CMB_RAW.[Language] = 'Korean' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'ZH' AND CSAT_CMB_RAW.[Language] = 'Chinese' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'XT4' AND CSAT_CMB_RAW.[Language] = 'Chinese (traditional)' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'HU' AND CSAT_CMB_RAW.[Language] = 'Hungarian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'HE4' AND CSAT_CMB_RAW.[Language] = 'Hebrew' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'ID4' AND CSAT_CMB_RAW.[Language] = 'Indonesian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'RU' AND CSAT_CMB_RAW.[Language] = 'Russian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'EL' AND CSAT_CMB_RAW.[Language] = 'Greek' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'BG' AND CSAT_CMB_RAW.[Language] = 'Bulgarian' THEN 1
+			WHEN ROSTER_RAW.[LOB] = 'VI TRA' AND CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1
+			ELSE 0 
+		END) 
 ELSE 0 END) AS [Csat Survey(UB)],
 /*Set up Csat_Score(EN)*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[Type] <> 'touchpoint' AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' AND CSAT_CMB_RAW.[Language] = 'English (Great Britain)' THEN 1
@@ -518,14 +633,14 @@ ELSE 0 END) AS [Csat Survey(XU)],
 /*Set up Csat_Score(VI-CSG)*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[Type] <> 'touchpoint' AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' 
 THEN (CASE WHEN ROSTER_RAW.[LOB] = 'VICSG' AND CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1
-           ELSE 0 
-      END) 
+			ELSE 0 
+		END) 
 ELSE 0 END) AS [Csat Score(VI-CSG)],
 /*Set up Csat_survey(VI-CSG)*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[Type] <> 'touchpoint' AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' 
 THEN (CASE WHEN ROSTER_RAW.[LOB] = 'VICSG' AND CSAT_CMB_RAW.[Language] = 'Vietnamese' THEN 1
-           ELSE 0 
-      END) 
+			ELSE 0 
+		END) 
 ELSE 0 END) AS [Csat Survey(VI-CSG)],
 /*Set up Csat_Score(VI-CSG Overall)*/
 SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[Type] <> 'touchpoint' AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' 
@@ -564,7 +679,7 @@ SUM(Case when CSAT_CMB_RAW.[Language] = 'English (Great Britain)' then (
 Case When CSAT_CMB_RAW.[Csat 2.0 Score] in ('Very Satisfied','Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' then 1 Else 0 End 
 ) Else 0 End) AS [Psat_Score(Bri)]
 FROM CSAT_CMB_RAW
-LEFT JOIN ROSTER_RAW ON ROSTER_RAW.[Emp ID] = CSAT_CMB_RAW.[Employee_ID] AND ROSTER_RAW.[Date] = CSAT_CMB_RAW.[Date]
+LEFT JOIN ROSTER_RAW ON ROSTER_RAW.[Emp ID] = CSAT_CMB_RAW.[Employee_ID] AND ROSTER_RAW.[Attribute] = CSAT_CMB_RAW.[Date]
 GROUP BY CSAT_CMB_RAW.[Date], CSAT_CMB_RAW.[Employee_ID]
 ),
 -- Create BCOM.Target_LOB 1 (RAW)
@@ -608,7 +723,7 @@ SELECT [Date], Staff_RAW.[Employee_ID],
 Sum(ISNULL(([length]*24*3600),0))                                                                                        AS [Total Ploted(s)],
 Sum(ISNULL((Case When [Scheduled Activity] in ('Open Time','Email 1') THEN ([length]*24*3600) ELSE Null END),0))         AS [Plotted Productive(s)],
 Sum(ISNULL((Case When [Scheduled Activity] in ('Coaching 1:1','Team Meeting',
-  'Coaching 1:1 Offline','Training A','Training N','Training U','Training Q') THEN ([length]*24*3600) ELSE Null END),0)) AS [Plotted Downtime(s)],
+	'Coaching 1:1 Offline','Training A','Training N','Training U','Training Q') THEN ([length]*24*3600) ELSE Null END),0)) AS [Plotted Downtime(s)],
 Sum(ISNULL((Case When [Scheduled Activity] = 'Open Time' THEN ([length]*24*3600) ELSE Null END),0))                      AS [Plotted Phone(s)],
 Sum(ISNULL((Case When [Scheduled Activity] = 'Email 1' THEN ([length]*24*3600) ELSE Null END),0))                        AS [Plotted Picklist(s)],
 Sum(ISNULL((Case When [Scheduled Activity] = 'Break Offline' THEN ([length]*24*3600) else Null END),0))                  AS [Break_Offline Ploted(s)],
@@ -646,74 +761,74 @@ Group by Staff_RAW.[Employee_ID],[Date]
 ),
 -- Create BCOM.RONA 1 (RAW)
 RONA_RAW As (
-Select Staff_RAW.[Employee_ID], CAST([DateTime] AS TIME) AS [Time], CAST([DateTime] AS DATE) AS [Date], DATEADD(DAY, -1, CAST([DateTime] AS DATE)) AS [D-1], RONA, ROSTER_RAW.[Shift_type] From BCOM.RONA
+Select Staff_RAW.[Employee_ID], CAST([DateTime] AS TIME) AS [Time], CAST([DateTime] AS DATE) AS [Date], DATEADD(DAY, -1, CAST([DateTime] AS DATE)) AS [D-1], RONA, ROSTER_RAW3.[Shift_type] From BCOM.RONA
 LEFT JOIN Staff_RAW ON Staff_RAW.[CUIC Name] = [Agent]
-LEFT JOIN ROSTER_RAW ON ROSTER_RAW.[Date] = CAST([DateTime] AS DATE) AND ROSTER_RAW.[Emp ID] = Staff_RAW.[Employee_ID]
+LEFT JOIN ROSTER_RAW3 ON ROSTER_RAW3.[Date] = CAST([DateTime] AS DATE) AND ROSTER_RAW3.[Emp ID] = Staff_RAW.[Employee_ID]
 ),
 -- Create BCOM.RONA 2 (Add: Session Date)
 RONA_RAW2 AS (
 SELECT 
-CASE WHEN (RONA_RAW.[Shift_type] <> 'DS' OR RONA_RAW.[Shift_type] IS NULL) AND ROSTER_RAW.[Shift_type] = 'NS' AND RONA_RAW.[Time] < '12:00:00' THEN RONA_RAW.[D-1] ELSE RONA_RAW.[Date] END AS [Session Date], RONA_RAW.[Employee_ID], SUM(RONA_RAW.[RONA]) AS [#RONA]
+CASE WHEN (RONA_RAW.[Shift_type] <> 'DS' OR RONA_RAW.[Shift_type] IS NULL) AND ROSTER_RAW3.[Shift_type] = 'NS' AND RONA_RAW.[Time] < '12:00:00' THEN RONA_RAW.[D-1] ELSE RONA_RAW.[Date] END AS [Session Date], RONA_RAW.[Employee_ID], SUM(RONA_RAW.[RONA]) AS [#RONA]
 FROM RONA_RAW
-LEFT JOIN ROSTER_RAW ON ROSTER_RAW.[Date] =  RONA_RAW.[D-1] AND ROSTER_RAW.[Emp ID] = RONA_RAW.[Employee_ID]
-GROUP BY (CASE WHEN (RONA_RAW.[Shift_type] <> 'DS' OR RONA_RAW.[Shift_type] IS NULL) AND ROSTER_RAW.[Shift_type] = 'NS' AND RONA_RAW.[Time] < '12:00:00' THEN RONA_RAW.[D-1] ELSE RONA_RAW.[Date] END), RONA_RAW.[Employee_ID]
+LEFT JOIN ROSTER_RAW3 ON ROSTER_RAW3.[Date] =  RONA_RAW.[D-1] AND ROSTER_RAW3.[Emp ID] = RONA_RAW.[Employee_ID]
+GROUP BY (CASE WHEN (RONA_RAW.[Shift_type] <> 'DS' OR RONA_RAW.[Shift_type] IS NULL) AND ROSTER_RAW3.[Shift_type] = 'NS' AND RONA_RAW.[Time] < '12:00:00' THEN RONA_RAW.[D-1] ELSE RONA_RAW.[Date] END), RONA_RAW.[Employee_ID]
 ),
 -- Create BCOM.CUIC 1 (RAW)
 CUIC_RAW AS (
-SELECT Staff_RAW.[Employee_ID], CAST([Interval] AS TIME) AS [Time], CAST([Interval] AS DATE) AS [Date], DATEADD(DAY, -1, CAST([Interval] AS DATE)) AS [D-1], ROSTER_RAW.[Shift_type], [AgentAvailTime], [AgentLoggedOnTime] FROM BCOM.CUIC
+SELECT Staff_RAW.[Employee_ID], CAST([Interval] AS TIME) AS [Time], CAST([Interval] AS DATE) AS [Date], DATEADD(DAY, -1, CAST([Interval] AS DATE)) AS [D-1], ROSTER_RAW3.[Shift_type], [AgentAvailTime], [AgentLoggedOnTime] FROM BCOM.CUIC
 LEFT JOIN Staff_RAW ON Staff_RAW.[Booking Login ID] = [LoginName]
-LEFT JOIN ROSTER_RAW ON ROSTER_RAW.[Date] = CAST([Interval] AS DATE) AND ROSTER_RAW.[Emp ID] = Staff_RAW.[Employee_ID]
+LEFT JOIN ROSTER_RAW3 ON ROSTER_RAW3.[Date] = CAST([Interval] AS DATE) AND ROSTER_RAW3.[Emp ID] = Staff_RAW.[Employee_ID]
 ),
 -- Create BCOM.CUIC 2 (Add: Session Date)
 CUIC_RAW2 AS (
 SELECT 
-CASE WHEN (CUIC_RAW.[Shift_type] <> 'DS' OR CUIC_RAW.[Shift_type] IS NULL) AND ROSTER_RAW.[Shift_type] = 'NS' AND CUIC_RAW.[Time] < '12:00:00' THEN CUIC_RAW.[D-1] ELSE CUIC_RAW.[Date] END AS [Session Date],
+CASE WHEN (CUIC_RAW.[Shift_type] <> 'DS' OR CUIC_RAW.[Shift_type] IS NULL) AND ROSTER_RAW3.[Shift_type] = 'NS' AND CUIC_RAW.[Time] < '12:00:00' THEN CUIC_RAW.[D-1] ELSE CUIC_RAW.[Date] END AS [Session Date],
 CUIC_RAW.[Employee_ID], SUM(CUIC_RAW.[AgentAvailTime]*24*3600) AS [AgentAvailTime(s)], SUM(CUIC_RAW.[AgentLoggedOnTime]*24*3600) AS [CUICLoggedTime(s)]
 FROM CUIC_RAW
-LEFT JOIN ROSTER_RAW ON ROSTER_RAW.[Date] =  CUIC_RAW.[D-1] AND ROSTER_RAW.[Emp ID] = CUIC_RAW.[Employee_ID]
-GROUP BY (CASE WHEN (CUIC_RAW.[Shift_type] <> 'DS' OR CUIC_RAW.[Shift_type] IS NULL) AND ROSTER_RAW.[Shift_type] = 'NS' AND CUIC_RAW.[Time] < '12:00:00' THEN CUIC_RAW.[D-1] ELSE CUIC_RAW.[Date] END),CUIC_RAW.[Employee_ID]
+LEFT JOIN ROSTER_RAW3 ON ROSTER_RAW3.[Date] =  CUIC_RAW.[D-1] AND ROSTER_RAW3.[Emp ID] = CUIC_RAW.[Employee_ID]
+GROUP BY (CASE WHEN (CUIC_RAW.[Shift_type] <> 'DS' OR CUIC_RAW.[Shift_type] IS NULL) AND ROSTER_RAW3.[Shift_type] = 'NS' AND CUIC_RAW.[Time] < '12:00:00' THEN CUIC_RAW.[D-1] ELSE CUIC_RAW.[Date] END),CUIC_RAW.[Employee_ID]
 ),
 -- Create EEAAO 1 (RAW)
 EEAAO_RAW AS (
 SELECT
-ROSTER_RAW.[YEAR], ROSTER_RAW.[MONTH], ROSTER_RAW.[Date], ROSTER_RAW.[Week_num], ROSTER_RAW.[Week_day], ROSTER_RAW.[DPE_ID], ROSTER_RAW.[DPE_Name], ROSTER_RAW.[OM_ID], ROSTER_RAW.[OM_Name], 
-ROSTER_RAW.[TL_ID], ROSTER_RAW.[TL_Name], ROSTER_RAW.[Emp ID], ROSTER_RAW.[Emp_Name], ROSTER_RAW.[Work Type], ROSTER_RAW.[Wave], ROSTER_RAW.[Booking Login ID], ROSTER_RAW.[TED Name], ROSTER_RAW.[cnx_email], ROSTER_RAW.[Booking Email], 
-ROSTER_RAW.[CUIC Name], ROSTER_RAW.[PST_Start_Date], ROSTER_RAW.[Termination/Transfer], ROSTER_RAW.[Tenure], ROSTER_RAW.[Tenure days], ROSTER_RAW.[LOB], ROSTER_RAW.[LOB Group], PremHday_RAW.[Holiday],
-RAMCO_RAW.[Ramco_Code], ROSTER_RAW.[Shift], ROSTER_RAW.[Original_Shift], ROSTER_RAW.[week_shift], ROSTER_RAW.[week_off], ROSTER_RAW.[Shift_definition], ROSTER_RAW.[Shift_type],
+ROSTER_RAW3.[YEAR], ROSTER_RAW3.[MONTH], ROSTER_RAW3.[Date], ROSTER_RAW3.[Week_num], ROSTER_RAW3.[Week_day], ROSTER_RAW3.[DPE_ID], ROSTER_RAW3.[DPE_Name], ROSTER_RAW3.[OM_ID], ROSTER_RAW3.[OM_Name], 
+ROSTER_RAW3.[TL_ID], ROSTER_RAW3.[TL_Name], ROSTER_RAW3.[Emp ID], ROSTER_RAW3.[Emp_Name], ROSTER_RAW3.[Work Type], ROSTER_RAW3.[Wave], ROSTER_RAW3.[Booking Login ID], ROSTER_RAW3.[TED Name], ROSTER_RAW3.[cnx_email], ROSTER_RAW3.[Booking Email], 
+ROSTER_RAW3.[CUIC Name], ROSTER_RAW3.[PST_Start_Date], ROSTER_RAW3.[Termination/Transfer], ROSTER_RAW3.[Tenure], ROSTER_RAW3.[Tenure days], ROSTER_RAW3.[LOB], ROSTER_RAW3.[LOB Group], PremHday_RAW.[Holiday],
+RAMCO_RAW.[Ramco_Code], ROSTER_RAW3.[Shift], ROSTER_RAW3.[Original_Shift], ROSTER_RAW3.[week_shift], ROSTER_RAW3.[week_off], ROSTER_RAW3.[Shift_definition], ROSTER_RAW3.[Shift_type],
 /*Set up ATD Mismatch*/
 Case
-    When RAMCO_RAW.[Ramco_Code] = 'PO' AND ROSTER_RAW.[Shift] = 'OFF' THEN 'Valid'
-	When RAMCO_RAW.[Ramco_Code] = 'PR' AND ROSTER_RAW.[Shift] = 'HAL' THEN 'ATD MM'
-	When RAMCO_RAW.[Ramco_Code] = 'HAL' AND ROSTER_RAW.[Shift] <> 'HAL' THEN 'ATD MM'
-	When RAMCO_RAW.[Ramco_Code] = 'HLWP' AND ROSTER_RAW.[Shift] <> 'HAL' THEN 'ATD MM'
-    When RAMCO_RAW.[Ramco_Code] is Null AND ROSTER_RAW.[Shift] IS NOT Null THEN Null  
-    When RAMCO_RAW.[Ramco_Code] IS NOT Null AND ROSTER_RAW.[Shift] is Null THEN Null
-    When RAMCO_RAW.[Ramco_Code] is Null AND ROSTER_RAW.[Shift] is Null THEN 'Valid'
-    When RAMCO_RAW.[Ramco_Code] = 'AB' AND ROSTER_RAW.[Shift_definition] = 'WORK' THEN 'Valid'
-    When (Case When Roster_Raw.[Shift_definition] = 'WORK' Then 'WORK'
-               When Roster_Raw.[Shift_definition] is Null then Null Else 'OFF' End) = RAMCO_RAW.[Ramco_Define] THEN 'Valid'
+	When RAMCO_RAW.[Ramco_Code] = 'PO' AND ROSTER_RAW3.[Shift] = 'OFF' THEN 'Valid'
+	When RAMCO_RAW.[Ramco_Code] = 'PR' AND ROSTER_RAW3.[Shift] = 'HAL' THEN 'ATD MM'
+	When RAMCO_RAW.[Ramco_Code] = 'HAL' AND ROSTER_RAW3.[Shift] <> 'HAL' THEN 'ATD MM'
+	When RAMCO_RAW.[Ramco_Code] = 'HLWP' AND ROSTER_RAW3.[Shift] <> 'HAL' THEN 'ATD MM'
+	When RAMCO_RAW.[Ramco_Code] is Null AND ROSTER_RAW3.[Shift] IS NOT Null THEN Null  
+	When RAMCO_RAW.[Ramco_Code] IS NOT Null AND ROSTER_RAW3.[Shift] is Null THEN Null
+	When RAMCO_RAW.[Ramco_Code] is Null AND ROSTER_RAW3.[Shift] is Null THEN 'Valid'
+	When RAMCO_RAW.[Ramco_Code] = 'AB' AND ROSTER_RAW3.[Shift_definition] = 'WORK' THEN 'Valid'
+	When (Case When Roster_Raw3.[Shift_definition] = 'WORK' Then 'WORK'
+				When Roster_Raw3.[Shift_definition] is Null then Null Else 'OFF' End) = RAMCO_RAW.[Ramco_Define] THEN 'Valid'
 Else 'ATD MM' End As [ATD_Mismatch],
 /*Set up GAP Shift*/
 CASE 
 WHEN 
 DATEADD(SECOND,75600,(
 DATEADD(SECOND,
-DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_Pre1_RAW.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_Pre1_RAW.[Shift], 3, 2) AS INT), 0, 0, 0)),
-CAST(ROSTER_Pre1_RAW.[Date-1] AS DATETIME)))) IS NULL OR
+DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_Pre1_RAW2.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_Pre1_RAW2.[Shift], 3, 2) AS INT), 0, 0, 0)),
+CAST(ROSTER_Pre1_RAW2.[Date-1] AS DATETIME)))) IS NULL OR
 DATEADD(SECOND,
-DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 3, 2) AS INT), 0, 0, 0)),
-CAST(Roster_Raw.[Date] AS DATETIME)) IS NULL THEN 0
+DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 3, 2) AS INT), 0, 0, 0)),
+CAST(Roster_Raw3.[Date] AS DATETIME)) IS NULL THEN 0
 WHEN 
 DATEADD(SECOND,75600,(
 DATEADD(SECOND,
-DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_Pre1_RAW.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_Pre1_RAW.[Shift], 3, 2) AS INT), 0, 0, 0)),
-CAST(ROSTER_Pre1_RAW.[Date-1] AS DATETIME))))
+DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_Pre1_RAW2.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_Pre1_RAW2.[Shift], 3, 2) AS INT), 0, 0, 0)),
+CAST(ROSTER_Pre1_RAW2.[Date-1] AS DATETIME))))
 >
 DATEADD(SECOND,
-DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 3, 2) AS INT), 0, 0, 0)),
-CAST(Roster_Raw.[Date] AS DATETIME)) THEN 1 ELSE 0 END AS [Gap_Shift],
-SUM(CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PO' THEN 1 ELSE 0 END) OVER (PARTITION BY ROSTER_RAW.[YEAR],ROSTER_RAW.[MONTH],ROSTER_RAW.[Emp ID] ORDER BY ROSTER_RAW.[Date]) AS [PO_Count(MTD)],   
-SUM(CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PR' THEN 1 ELSE 0 END) OVER (PARTITION BY ROSTER_RAW.[YEAR],ROSTER_RAW.[MONTH],ROSTER_RAW.[Emp ID] ORDER BY ROSTER_RAW.[Date]) AS [PR_Count(MTD)],
+DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 3, 2) AS INT), 0, 0, 0)),
+CAST(Roster_Raw3.[Date] AS DATETIME)) THEN 1 ELSE 0 END AS [Gap_Shift],
+SUM(CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PO' THEN 1 ELSE 0 END) OVER (PARTITION BY ROSTER_RAW3.[YEAR],ROSTER_RAW3.[MONTH],ROSTER_RAW3.[Emp ID] ORDER BY ROSTER_RAW3.[Date]) AS [PO_Count(MTD)],   
+SUM(CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PR' THEN 1 ELSE 0 END) OVER (PARTITION BY ROSTER_RAW3.[YEAR],ROSTER_RAW3.[MONTH],ROSTER_RAW3.[Emp ID] ORDER BY ROSTER_RAW3.[Date]) AS [PR_Count(MTD)],
 /*Set up OverConsecutive*/
 CASE
 WHEN RAMCO_RAW.[Ramco_Define] = 'WORK' And (RAMCO_RAW_Pre1.[Ramco_Define_Pre1] = 'OFF' OR RAMCO_RAW_Pre1.[Ramco_Define_Pre1] is Null) Then '1' WHEN RAMCO_RAW.[Ramco_Define] = 'WORK' And RAMCO_RAW_Pre1.[Ramco_Define_Pre1] = 'WORK' And (RAMCO_RAW_Pre2.[Ramco_Define_Pre2] = 'OFF' OR RAMCO_RAW_Pre2.[Ramco_Define_Pre2] is Null) Then '2'
@@ -732,25 +847,25 @@ Case When --When they Late & Soon => 'Late-Soon'
 CASE WHEN 
 DATEADD(minute, 15, 
 DATEADD(SECOND,
-DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 3, 2) AS INT), 0, 0, 0)),
-CAST(ROSTER_RAW.[Date] AS DATETIME))) 
+DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 3, 2) AS INT), 0, 0, 0)),
+CAST(ROSTER_RAW3.[Date] AS DATETIME))) 
 < EPS_RAW4.[Login] THEN 'Late' ELSE '' END
 ) = 'Late'
 AND
 (
 CASE 
-WHEN ROSTER_RAW.[Shift] = '1500-0000'
+WHEN ROSTER_RAW3.[Shift] = '1500-0000'
 AND 
 DATEADD(minute, 45, 
 DATEADD(hour, 23,
-CAST(ROSTER_RAW.[Date] AS DATETIME))) 
+CAST(ROSTER_RAW3.[Date] AS DATETIME))) 
 > EPS_RAW4.[Logout] THEN 'Soon'
-WHEN ROSTER_RAW.[Shift] <> '1500-0000'
+WHEN ROSTER_RAW3.[Shift] <> '1500-0000'
 AND 
 DATEADD(second, 31500, 
 DATEADD(SECOND,
-DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 3, 2) AS INT), 0, 0, 0)),
-CAST(ROSTER_RAW.[Date] AS DATETIME))) 
+DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 3, 2) AS INT), 0, 0, 0)),
+CAST(ROSTER_RAW3.[Date] AS DATETIME))) 
 > EPS_RAW4.[Logout] THEN 'Soon' ELSE '' END
 ) = 'Soon' 
 Then 'Late-Soon'
@@ -759,30 +874,30 @@ Else --When they Late or Soon => Concat(Late,Soon)
 CASE WHEN 
 DATEADD(minute, 15, 
 DATEADD(SECOND,
-DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 3, 2) AS INT), 0, 0, 0)),
-CAST(ROSTER_RAW.[Date] AS DATETIME))) 
+DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 3, 2) AS INT), 0, 0, 0)),
+CAST(ROSTER_RAW3.[Date] AS DATETIME))) 
 < EPS_RAW4.[Login] THEN 'Late' ELSE '' END
 ) + (
 CASE 
-WHEN ROSTER_RAW.[Shift] = '1500-0000'
+WHEN ROSTER_RAW3.[Shift] = '1500-0000'
 AND 
 DATEADD(minute, 45, 
 DATEADD(hour, 23,
-CAST(ROSTER_RAW.[Date] AS DATETIME))) 
+CAST(ROSTER_RAW3.[Date] AS DATETIME))) 
 > EPS_RAW4.[Logout] THEN 'Soon'
-WHEN ROSTER_RAW.[Shift] <> '1500-0000'
+WHEN ROSTER_RAW3.[Shift] <> '1500-0000'
 AND 
 DATEADD(second, 31500, 
 DATEADD(SECOND,
-DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 3, 2) AS INT), 0, 0, 0)),
-CAST(ROSTER_RAW.[Date] AS DATETIME))) 
+DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 3, 2) AS INT), 0, 0, 0)),
+CAST(ROSTER_RAW3.[Date] AS DATETIME))) 
 > EPS_RAW4.[Logout] THEN 'Soon' ELSE '' END
 ) End) Else Null End,'') As [Late-Soon],
 /*Set up PR<8.75*/
 Case When ISNULL(EPS_RAW4.[StaffTime(s)],0)  +  ISNULL(ExceptionReq_RAW.[Req_Second],0) < 31500 and RAMCO_RAW.[Ramco_Code] = 'PR' Then 1 Else 0 End As [PR<8.75],
 /*Set up LoggedInOnOffDay*/
 Case When 
-(Case when ROSTER_RAW.[Shift_definition] = 'WORK' Then 'WORK' when ROSTER_RAW.[Shift_definition] is Null then Null Else 'OFF' END) = 'OFF'
+(Case when ROSTER_RAW3.[Shift_definition] = 'WORK' Then 'WORK' when ROSTER_RAW3.[Shift_definition] is Null then Null Else 'OFF' END) = 'OFF'
 And RAMCO_RAW.[Ramco_Define] = 'OFF'
 And ISNULL(EPS_RAW4.[StaffTime(s)],0) > 60 
 Then 1 Else 0 End as [LoggedInOnOffDay],
@@ -795,55 +910,55 @@ WHEN ISNULL(RegisteredOT_RAW.[OT_Registered(s)],0) <= 0 or RAMCO_RAW.[Ramco_Code
 WHEN 
 --Extra rendered = Delivery + Break + Exception - STANDARD
 ((ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Meeting(s)],0) + 
-  ISNULL(EPS_RAW4.[Training(s)],0) + ISNULL(EPS_RAW4.[New_Hire_Training(s)],0) + ISNULL(EPS_RAW4.[Break(s)],0) + ISNULL(ExceptionReq_RAW.[Req_Second],0)) - 
+	ISNULL(EPS_RAW4.[Training(s)],0) + ISNULL(EPS_RAW4.[New_Hire_Training(s)],0) + ISNULL(EPS_RAW4.[Break(s)],0) + ISNULL(ExceptionReq_RAW.[Req_Second],0)) - 
 --STANDARD
-(CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PR' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW.[Original_Shift] <> 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] + (8*3600)
-      WHEN RAMCO_RAW.[Ramco_Code] = 'PO' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW.[Original_Shift] = 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] ELSE 0 END)) >= 0 THEN RegisteredOT_RAW.[OT_Registered(s)]
+(CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PR' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW3.[Original_Shift] <> 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] + (8*3600)
+		WHEN RAMCO_RAW.[Ramco_Code] = 'PO' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW3.[Original_Shift] = 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] ELSE 0 END)) >= 0 THEN RegisteredOT_RAW.[OT_Registered(s)]
 --When OT_Regisster + Extra_rendered_hours < 0 then 0
-      WHEN RegisteredOT_RAW.[OT_Registered(s)] + --Extra rendered hours
+		WHEN RegisteredOT_RAW.[OT_Registered(s)] + --Extra rendered hours
 ((ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Meeting(s)],0) + 
-  ISNULL(EPS_RAW4.[Training(s)],0) + ISNULL(EPS_RAW4.[New_Hire_Training(s)],0) + ISNULL(EPS_RAW4.[Break(s)],0) + ISNULL(ExceptionReq_RAW.[Req_Second],0)) - 
-(CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PR' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW.[Original_Shift] <> 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] + (8*3600)
-      WHEN RAMCO_RAW.[Ramco_Code] = 'PO' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW.[Original_Shift] = 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] ELSE 0 END)) < 0 THEN 0
+	ISNULL(EPS_RAW4.[Training(s)],0) + ISNULL(EPS_RAW4.[New_Hire_Training(s)],0) + ISNULL(EPS_RAW4.[Break(s)],0) + ISNULL(ExceptionReq_RAW.[Req_Second],0)) - 
+(CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PR' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW3.[Original_Shift] <> 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] + (8*3600)
+		WHEN RAMCO_RAW.[Ramco_Code] = 'PO' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW3.[Original_Shift] = 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] ELSE 0 END)) < 0 THEN 0
 --else  OT_Regisster + Extra_rendered_hours 
-      ELSE RegisteredOT_RAW.[OT_Registered(s)] + --Extra rendered hours
+		ELSE RegisteredOT_RAW.[OT_Registered(s)] + --Extra rendered hours
 ((ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Meeting(s)],0) + 
-  ISNULL(EPS_RAW4.[Training(s)],0) + ISNULL(EPS_RAW4.[New_Hire_Training(s)],0) + ISNULL(EPS_RAW4.[Break(s)],0) + ISNULL(ExceptionReq_RAW.[Req_Second],0)) - 
-(CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PR' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW.[Original_Shift] <> 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] + (8*3600)
-      WHEN RAMCO_RAW.[Ramco_Code] = 'PO' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW.[Original_Shift] = 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] ELSE 0 END)) END),0) AS [Approve OT(s)],
-ISNULL(OTRAMCO_RAW.[OT_Ramco(s)],0) AS [OT_Ramco(s)], ISNULL(OTRAMCO_RAW.[PH_Ramco(s)],0) AS [PH_Ramco(s)], ISNULL(OTRAMCO_RAW.[NSA_Ramco(s)],0) AS [NSA_Ramco(s)],
+	ISNULL(EPS_RAW4.[Training(s)],0) + ISNULL(EPS_RAW4.[New_Hire_Training(s)],0) + ISNULL(EPS_RAW4.[Break(s)],0) + ISNULL(ExceptionReq_RAW.[Req_Second],0)) - 
+(CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PR' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW3.[Original_Shift] <> 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] + (8*3600)
+		WHEN RAMCO_RAW.[Ramco_Code] = 'PO' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW3.[Original_Shift] = 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] ELSE 0 END)) END),0) AS [Approve OT(s)],
+ISNULL(OTRAMCO_RAW.[OT_Ramco(s)],0) AS [OT_Ramco(s)], ISNULL(PHRAMCO_RAW.[PH_Ramco(s)],0) AS [PH_Ramco(s)], ISNULL(NSARAMCO_RAW.[NSA_Ramco(s)],0) AS [NSA_Ramco(s)],
 /*Set up LoggedOutAfterShift*/
 Case When EPS_RAW4.[Logout] >  --Time should out
 (Case when RAMCO_RAW.[Ramco_Code] in ('PR','PH','PI') then   
 DATEADD(second, COALESCE(RegisteredOT_RAW.[OT_Registered(s)], 0) + 33300, 
 DATEADD(SECOND,
-DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 3, 2) AS INT), 0, 0, 0)),
-CAST(ROSTER_RAW.[Date] AS DATETIME)))
+DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 3, 2) AS INT), 0, 0, 0)),
+CAST(ROSTER_RAW3.[Date] AS DATETIME)))
 When RAMCO_RAW.[Ramco_Code] = 'PO' then
 DATEADD(second, 33300, 
 DATEADD(SECOND,
-DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 3, 2) AS INT), 0, 0, 0)),
-CAST(ROSTER_RAW.[Date] AS DATETIME)))
+DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 3, 2) AS INT), 0, 0, 0)),
+CAST(ROSTER_RAW3.[Date] AS DATETIME)))
 Else Null End) Then 1 Else 0 End as [NotLoggedOutAfterShift],
 /*Set up LoggedInBeforeShift*/
 Case When EPS_RAW4.[Login] <  --Time should in
 (Case when RAMCO_RAW.[Ramco_Code] in ('PR','PH','PI') then
 DATEADD(second, -(CAST(ISNULL(RegisteredOT_RAW.[OT_Registered(s)], 0) AS INT) + 1200), 
 DATEADD(SECOND,
-DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 3, 2) AS INT), 0, 0, 0)),
-CAST(ROSTER_RAW.[Date] AS DATETIME)))	  
+DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 3, 2) AS INT), 0, 0, 0)),
+CAST(ROSTER_RAW3.[Date] AS DATETIME)))	  
 When RAMCO_RAW.[Ramco_Code] = 'PO' then
 DATEADD(second, -1200, 
 DATEADD(SECOND,
-DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW.[Shift], 3, 2) AS INT), 0, 0, 0)),
-CAST(ROSTER_RAW.[Date] AS DATETIME)))
+DATEDIFF(SECOND,CAST('00:00:00' AS TIME), TIMEFROMPARTS(TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 1, 2) AS INT),TRY_CAST(SUBSTRING(ROSTER_RAW3.[Shift], 3, 2) AS INT), 0, 0, 0)),
+CAST(ROSTER_RAW3.[Date] AS DATETIME)))
 Else Null End) Then 1 Else 0 End as [LoggedInBeforeShift],
 /*Set up LowPerf*/
 Case when
 ISNULL(CPI_RAW3.[Total_Cases],0)/
 CASE 
-    WHEN ISNULL(CASE WHEN   (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +   ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0)) = 0 THEN 1    ELSE     (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +  ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0)) END ,0)/3600 = 0 THEN 1  -- Thay 1 bằng giá trị mặc định
-    ELSE ISNULL(CASE WHEN   (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +   ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0)) = 0 THEN 1    ELSE     (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +  ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0)) END ,0)/3600
+	WHEN ISNULL(CASE WHEN   (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +   ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0)) = 0 THEN 1    ELSE     (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +  ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0)) END ,0)/3600 = 0 THEN 1  -- Thay 1 bằng giá trị mặc định
+	ELSE ISNULL(CASE WHEN   (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +   ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0)) = 0 THEN 1    ELSE     (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +  ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0)) END ,0)/3600
 END
 < 2    AND RAMCO_RAW.[Ramco_Define] = 'WORK' THEN 1 ELSE 0 END AS [LowPerf],
 ISNULL(ExceptionReq_RAW.[Req_Second],0) AS [ExceptionReq(s)],
@@ -887,10 +1002,10 @@ WpSummary_RAW.[Total Ploted(s)], WpSummary_RAW.[Plotted Productive(s)], WpSummar
 WpSummary_RAW.[Break_Offline Ploted(s)], WpSummary_RAW.[Lunch Ploted(s)], WpSummary_RAW.[Coaching Ploted(s)], WpSummary_RAW.[Team_Meeting Ploted(s)], WpSummary_RAW.[Break Ploted(s)], 
 WpSummary_RAW.[Training Ploted(s)], WpSummary_RAW.[Training_Offline Ploted(s)], WpSummary_RAW.[Termination Ploted(s)], 
 /*Set up Attendance*/
-CASE WHEN ISNULL(CUIC_RAW2.[CUICLoggedTime(s)],0) > (ISNULL(ROSTER_RAW.[ScheduleSeconds(s)],0) + ISNULL(RegisteredOT_RAW.[OT_Registered(s)],0)) 
-THEN (ISNULL(ROSTER_RAW.[ScheduleSeconds(s)],0) + ISNULL(RegisteredOT_RAW.[OT_Registered(s)],0))
+CASE WHEN ISNULL(CUIC_RAW2.[CUICLoggedTime(s)],0) > (ISNULL(ROSTER_RAW3.[ScheduleSeconds(s)],0) + ISNULL(RegisteredOT_RAW.[OT_Registered(s)],0)) 
+THEN (ISNULL(ROSTER_RAW3.[ScheduleSeconds(s)],0) + ISNULL(RegisteredOT_RAW.[OT_Registered(s)],0))
 ELSE ISNULL(CUIC_RAW2.[CUICLoggedTime(s)],0) END AS [Attendance(s)],
-ROSTER_RAW.[ScheduleSeconds(s)],
+ROSTER_RAW3.[ScheduleSeconds(s)],
 EPS_RAW4.[StaffTime(s)], EPS_RAW4.[Night_StaffTime(s)], EPS_RAW4.[Day_StaffTime(s)], 
 EPS_RAW4.[Break(s)], EPS_RAW4.[Night_Break(s)], EPS_RAW4.[Day_Break(s)], 
 EPS_RAW4.[Global_Support(s)], EPS_RAW4.[Night_Global_Support(s)], EPS_RAW4.[Day_Global_Support(s)], 
@@ -937,84 +1052,86 @@ COALESCE(Target_LOB_RAW.[Quality - personalization tar],   Target_LOBGROUP_RAW.[
 COALESCE(Target_LOB_RAW.[Quality - proactivity tar],       Target_LOBGROUP_RAW.[Quality - proactivity tar])        as [Quality - proactivity tar],        -- combine Tar_LOB & Tar_LOBGROUP
 COALESCE(Target_LOB_RAW.[Quality - resolution tar],        Target_LOBGROUP_RAW.[Quality - resolution tar])         as [Quality - resolution tar],         -- combine Tar_LOB & Tar_LOBGROUP
 -- Setup [ScheduleHours(H)]
-CASE WHEN CHARINDEX('-', ROSTER_RAW.[Shift]) = 5 THEN 7.50 WHEN ROSTER_RAW.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END AS [ScheduleHours(H)],
+CASE WHEN CHARINDEX('-', ROSTER_RAW3.[Shift]) = 5 THEN 7.50 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END AS [ScheduleHours(H)],
 -- Setup [IO_Standard(H)]
-CASE WHEN CHARINDEX('-', ROSTER_RAW.[Shift]) = 5 THEN 8 WHEN ROSTER_RAW.[Shift] IN ('HAL','HSL') THEN 4 ELSE 0 END AS [IO_Standard(H)],
+CASE WHEN CHARINDEX('-', ROSTER_RAW3.[Shift]) = 5 THEN 8 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 4 ELSE 0 END AS [IO_Standard(H)],
 -- Setup [IO_Standard_ExcluBreak(H)]
-CASE WHEN CHARINDEX('-', ROSTER_RAW.[Shift]) = 5 THEN 7.5 WHEN ROSTER_RAW.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END AS [IO_Standard_ExcluBreak(H)],
+CASE WHEN CHARINDEX('-', ROSTER_RAW3.[Shift]) = 5 THEN 7.5 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END AS [IO_Standard_ExcluBreak(H)],
 -- Setup [SchedLeave(H)]
-CASE WHEN ROSTER_RAW.[Shift] IN ('AL','UPL','CO','VGH') THEN 7.50 WHEN ROSTER_RAW.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END AS [SchedLeave(H)],
+CASE WHEN ROSTER_RAW3.[Shift] IN ('AL','UPL','CO','VGH') THEN 7.50 WHEN ROSTER_RAW3.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END AS [SchedLeave(H)],
 -- Setup [SchedUPL(H)]
-CASE WHEN ROSTER_RAW.[Shift] IN ('UPL') THEN 7.50 WHEN ROSTER_RAW.[Shift] IN ('HSL') THEN 3.75 ELSE 0 END AS [SchedUPL(H)]
-FROM ROSTER_RAW
-LEFT JOIN PremHday_RAW ON PremHday_RAW.[Date] = ROSTER_RAW.[Date]
-LEFT JOIN RAMCO_RAW ON RAMCO_RAW.[EID] = ROSTER_RAW.[Emp ID] AND RAMCO_RAW.[Date] = ROSTER_RAW.[Date]
-LEFT JOIN ROSTER_Pre1_RAW ON ROSTER_Pre1_RAW.[Date-1] = Dateadd(day, -1, ROSTER_RAW.[Date]) AND ROSTER_Pre1_RAW.[Emp ID] = ROSTER_RAW.[Emp ID]
-LEFT JOIN RAMCO_RAW_Pre1 ON ROSTER_RAW.[Emp ID] = RAMCO_RAW_Pre1.[EID] AND Dateadd(day, -1, ROSTER_RAW.[Date]) = RAMCO_RAW_Pre1.[Date]
-LEFT JOIN RAMCO_RAW_Pre2 ON ROSTER_RAW.[Emp ID] = RAMCO_RAW_Pre2.[EID] AND Dateadd(day, -2, ROSTER_RAW.[Date]) = RAMCO_RAW_Pre2.[Date]
-LEFT JOIN RAMCO_RAW_Pre3 ON ROSTER_RAW.[Emp ID] = RAMCO_RAW_Pre3.[EID] AND Dateadd(day, -3, ROSTER_RAW.[Date]) = RAMCO_RAW_Pre3.[Date]
-LEFT JOIN RAMCO_RAW_Pre4 ON ROSTER_RAW.[Emp ID] = RAMCO_RAW_Pre4.[EID] AND Dateadd(day, -4, ROSTER_RAW.[Date]) = RAMCO_RAW_Pre4.[Date]
-LEFT JOIN RAMCO_RAW_Pre5 ON ROSTER_RAW.[Emp ID] = RAMCO_RAW_Pre5.[EID] AND Dateadd(day, -5, ROSTER_RAW.[Date]) = RAMCO_RAW_Pre5.[Date]
-LEFT JOIN RAMCO_RAW_Pre6 ON ROSTER_RAW.[Emp ID] = RAMCO_RAW_Pre6.[EID] AND Dateadd(day, -6, ROSTER_RAW.[Date]) = RAMCO_RAW_Pre6.[Date]
-LEFT JOIN EPS_RAW4 ON EPS_RAW4.[Date] = ROSTER_RAW.[Date] AND ROSTER_RAW.[Emp ID] = EPS_RAW4.[Employee_ID]
-LEFT JOIN LogoutCount_RAW ON ROSTER_RAW.[Date] = LogoutCount_RAW.[Date] AND ROSTER_RAW.[TED Name] = LogoutCount_RAW.[TED_Name]
-LEFT JOIN ExceptionReq_RAW ON ROSTER_RAW.[Date] = ExceptionReq_RAW.[Date] AND ROSTER_RAW.[Emp ID] = ExceptionReq_RAW.[Emp ID]
-LEFT JOIN RegisteredOT_RAW ON ROSTER_RAW.[Date] = RegisteredOT_RAW.[Date] AND ROSTER_RAW.[Emp ID] = RegisteredOT_RAW.[Emp ID]
-LEFT JOIN OTRAMCO_RAW ON ROSTER_RAW.[Date] = OTRAMCO_RAW.[Date] AND ROSTER_RAW.[Emp ID] = OTRAMCO_RAW.[EID]
-LEFT JOIN CPI_RAW3 ON ROSTER_RAW.[Date] = CPI_RAW3.[Date] AND ROSTER_RAW.[Emp ID] = CPI_RAW3.[Employee_ID]
-LEFT JOIN RONA_RAW2 ON ROSTER_RAW.[Date] = RONA_RAW2.[Session Date] AND ROSTER_RAW.[Emp ID] = RONA_RAW2.[Employee_ID]
-LEFT JOIN CUIC_RAW2 ON ROSTER_RAW.[Date] = CUIC_RAW2.[Session Date] AND ROSTER_RAW.[Emp ID] = CUIC_RAW2.[Employee_ID]
-LEFT JOIN AHT_RAW ON ROSTER_RAW.[Date] = AHT_RAW.[Date] AND ROSTER_RAW.[Emp ID] = AHT_RAW.[Employee_ID]
-LEFT JOIN CSAT_CMB_RAW2 ON ROSTER_RAW.[Date] = CSAT_CMB_RAW2.[Date] AND ROSTER_RAW.[Emp ID] = CSAT_CMB_RAW2.[Employee_ID]
-LEFT JOIN Quality_RAW ON ROSTER_RAW.[Date] = Quality_RAW.[Date] AND ROSTER_RAW.[Emp ID] = Quality_RAW.[Employee_ID]
-LEFT JOIN WpSummary_RAW ON ROSTER_RAW.[Date] = WpSummary_RAW.[Date] AND ROSTER_RAW.[Emp ID] = WpSummary_RAW.[Employee_ID]
-LEFT JOIN Target_LOB_RAW ON  ROSTER_RAW.[Week_num] = Target_LOB_RAW.[Week] AND ROSTER_RAW.[Tenure days] = Target_LOB_RAW.[Tenure days] AND ROSTER_RAW.[LOB] = Target_LOB_RAW.[LOB]
-LEFT JOIN Target_LOBGROUP_RAW ON  ROSTER_RAW.[Week_num] = Target_LOBGROUP_RAW.[Week] AND ROSTER_RAW.[Tenure days] = Target_LOBGROUP_RAW.[Tenure days] AND ROSTER_RAW.[LOB Group] = Target_LOBGROUP_RAW.[LOB Group]
+CASE WHEN ROSTER_RAW3.[Shift] IN ('UPL') THEN 7.50 WHEN ROSTER_RAW3.[Shift] IN ('HSL') THEN 3.75 ELSE 0 END AS [SchedUPL(H)]
+FROM ROSTER_RAW3
+LEFT JOIN PremHday_RAW ON PremHday_RAW.[Date] = ROSTER_RAW3.[Date]
+LEFT JOIN RAMCO_RAW ON RAMCO_RAW.[EID] = ROSTER_RAW3.[Emp ID] AND RAMCO_RAW.[Date] = ROSTER_RAW3.[Date]
+LEFT JOIN ROSTER_Pre1_RAW2 ON ROSTER_Pre1_RAW2.[Date-1] = Dateadd(day, -1, ROSTER_RAW3.[Date]) AND ROSTER_Pre1_RAW2.[Emp ID] = ROSTER_RAW3.[Emp ID]
+LEFT JOIN RAMCO_RAW_Pre1 ON ROSTER_RAW3.[Emp ID] = RAMCO_RAW_Pre1.[EID] AND Dateadd(day, -1, ROSTER_RAW3.[Date]) = RAMCO_RAW_Pre1.[Date]
+LEFT JOIN RAMCO_RAW_Pre2 ON ROSTER_RAW3.[Emp ID] = RAMCO_RAW_Pre2.[EID] AND Dateadd(day, -2, ROSTER_RAW3.[Date]) = RAMCO_RAW_Pre2.[Date]
+LEFT JOIN RAMCO_RAW_Pre3 ON ROSTER_RAW3.[Emp ID] = RAMCO_RAW_Pre3.[EID] AND Dateadd(day, -3, ROSTER_RAW3.[Date]) = RAMCO_RAW_Pre3.[Date]
+LEFT JOIN RAMCO_RAW_Pre4 ON ROSTER_RAW3.[Emp ID] = RAMCO_RAW_Pre4.[EID] AND Dateadd(day, -4, ROSTER_RAW3.[Date]) = RAMCO_RAW_Pre4.[Date]
+LEFT JOIN RAMCO_RAW_Pre5 ON ROSTER_RAW3.[Emp ID] = RAMCO_RAW_Pre5.[EID] AND Dateadd(day, -5, ROSTER_RAW3.[Date]) = RAMCO_RAW_Pre5.[Date]
+LEFT JOIN RAMCO_RAW_Pre6 ON ROSTER_RAW3.[Emp ID] = RAMCO_RAW_Pre6.[EID] AND Dateadd(day, -6, ROSTER_RAW3.[Date]) = RAMCO_RAW_Pre6.[Date]
+LEFT JOIN EPS_RAW4 ON EPS_RAW4.[Date] = ROSTER_RAW3.[Date] AND ROSTER_RAW3.[Emp ID] = EPS_RAW4.[Employee_ID]
+LEFT JOIN LogoutCount_RAW ON ROSTER_RAW3.[Date] = LogoutCount_RAW.[Date] AND ROSTER_RAW3.[TED Name] = LogoutCount_RAW.[TED_Name]
+LEFT JOIN ExceptionReq_RAW ON ROSTER_RAW3.[Date] = ExceptionReq_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = ExceptionReq_RAW.[Emp ID]
+LEFT JOIN RegisteredOT_RAW ON ROSTER_RAW3.[Date] = RegisteredOT_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = RegisteredOT_RAW.[Emp ID]
+LEFT JOIN OTRAMCO_RAW ON ROSTER_RAW3.[Date] = OTRAMCO_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = OTRAMCO_RAW.[EID]
+LEFT JOIN PHRAMCO_RAW ON ROSTER_RAW3.[Date] = PHRAMCO_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = PHRAMCO_RAW.[EID]
+LEFT JOIN NSARAMCO_RAW ON ROSTER_RAW3.[Date] = NSARAMCO_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = NSARAMCO_RAW.[EID]
+LEFT JOIN CPI_RAW3 ON ROSTER_RAW3.[Date] = CPI_RAW3.[Date] AND ROSTER_RAW3.[Emp ID] = CPI_RAW3.[Employee_ID]
+LEFT JOIN RONA_RAW2 ON ROSTER_RAW3.[Date] = RONA_RAW2.[Session Date] AND ROSTER_RAW3.[Emp ID] = RONA_RAW2.[Employee_ID]
+LEFT JOIN CUIC_RAW2 ON ROSTER_RAW3.[Date] = CUIC_RAW2.[Session Date] AND ROSTER_RAW3.[Emp ID] = CUIC_RAW2.[Employee_ID]
+LEFT JOIN AHT_RAW ON ROSTER_RAW3.[Date] = AHT_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = AHT_RAW.[Employee_ID]
+LEFT JOIN CSAT_CMB_RAW2 ON ROSTER_RAW3.[Date] = CSAT_CMB_RAW2.[Date] AND ROSTER_RAW3.[Emp ID] = CSAT_CMB_RAW2.[Employee_ID]
+LEFT JOIN Quality_RAW ON ROSTER_RAW3.[Date] = Quality_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = Quality_RAW.[Employee_ID]
+LEFT JOIN WpSummary_RAW ON ROSTER_RAW3.[Date] = WpSummary_RAW.[Date] AND ROSTER_RAW3.[Emp ID] = WpSummary_RAW.[Employee_ID]
+LEFT JOIN Target_LOB_RAW ON  ROSTER_RAW3.[Week_num] = Target_LOB_RAW.[Week] AND ROSTER_RAW3.[Tenure days] = Target_LOB_RAW.[Tenure days] AND ROSTER_RAW3.[LOB] = Target_LOB_RAW.[LOB]
+LEFT JOIN Target_LOBGROUP_RAW ON  ROSTER_RAW3.[Week_num] = Target_LOBGROUP_RAW.[Week] AND ROSTER_RAW3.[Tenure days] = Target_LOBGROUP_RAW.[Tenure days] AND ROSTER_RAW3.[LOB Group] = Target_LOBGROUP_RAW.[LOB Group]
 ),
 -- Create EEAAO 2 (Add: Final Prepare)
 EEAAO_RAW2 AS (
 SELECT
-/*001 - ROSTER_RAW*/ EEAAO_RAW.[YEAR],
-/*002 - ROSTER_RAW*/ EEAAO_RAW.[MONTH],
-/*003 - ROSTER_RAW*/ EEAAO_RAW.[Date],
-/*004 - ROSTER_RAW*/ EEAAO_RAW.[Week_num],
-/*005 - ROSTER_RAW*/ EEAAO_RAW.[Week_day],
-/*006 - ROSTER_RAW*/ EEAAO_RAW.[DPE_ID],
-/*007 - ROSTER_RAW*/ EEAAO_RAW.[DPE_Name],
-/*008 - ROSTER_RAW*/ EEAAO_RAW.[OM_ID],
-/*009 - ROSTER_RAW*/ EEAAO_RAW.[OM_Name],
-/*010 - ROSTER_RAW*/ EEAAO_RAW.[TL_ID],
-/*011 - ROSTER_RAW*/ EEAAO_RAW.[TL_Name],
-/*012 - ROSTER_RAW*/ EEAAO_RAW.[Emp ID],
-/*013 - ROSTER_RAW*/ EEAAO_RAW.[Emp_Name],
-/*014 - ROSTER_RAW*/ EEAAO_RAW.[Work Type],
-/*015 - ROSTER_RAW*/ EEAAO_RAW.[Wave],
-/*016 - ROSTER_RAW*/ EEAAO_RAW.[Booking Login ID],
-/*017 - ROSTER_RAW*/ EEAAO_RAW.[TED Name],
-/*018 - ROSTER_RAW*/ EEAAO_RAW.[cnx_email],
-/*019 - ROSTER_RAW*/ EEAAO_RAW.[Booking Email],
-/*020 - ROSTER_RAW*/ EEAAO_RAW.[CUIC Name],
-/*021 - ROSTER_RAW*/ EEAAO_RAW.[PST_Start_Date],
-/*022 - ROSTER_RAW*/ EEAAO_RAW.[Termination/Transfer],
+/*001 - ROSTER_RAW3*/ EEAAO_RAW.[YEAR],
+/*002 - ROSTER_RAW3*/ EEAAO_RAW.[MONTH],
+/*003 - ROSTER_RAW3*/ EEAAO_RAW.[Date],
+/*004 - ROSTER_RAW3*/ EEAAO_RAW.[Week_num],
+/*005 - ROSTER_RAW3*/ EEAAO_RAW.[Week_day],
+/*006 - ROSTER_RAW3*/ EEAAO_RAW.[DPE_ID],
+/*007 - ROSTER_RAW3*/ EEAAO_RAW.[DPE_Name],
+/*008 - ROSTER_RAW3*/ EEAAO_RAW.[OM_ID],
+/*009 - ROSTER_RAW3*/ EEAAO_RAW.[OM_Name],
+/*010 - ROSTER_RAW3*/ EEAAO_RAW.[TL_ID],
+/*011 - ROSTER_RAW3*/ EEAAO_RAW.[TL_Name],
+/*012 - ROSTER_RAW3*/ EEAAO_RAW.[Emp ID],
+/*013 - ROSTER_RAW3*/ EEAAO_RAW.[Emp_Name],
+/*014 - ROSTER_RAW3*/ EEAAO_RAW.[Work Type],
+/*015 - ROSTER_RAW3*/ EEAAO_RAW.[Wave],
+/*016 - ROSTER_RAW3*/ EEAAO_RAW.[Booking Login ID],
+/*017 - ROSTER_RAW3*/ EEAAO_RAW.[TED Name],
+/*018 - ROSTER_RAW3*/ EEAAO_RAW.[cnx_email],
+/*019 - ROSTER_RAW3*/ EEAAO_RAW.[Booking Email],
+/*020 - ROSTER_RAW3*/ EEAAO_RAW.[CUIC Name],
+/*021 - ROSTER_RAW3*/ EEAAO_RAW.[PST_Start_Date],
+/*022 - ROSTER_RAW3*/ EEAAO_RAW.[Termination/Transfer],
 /*023 - Staff_RAW*/ EEAAO_RAW.[Tenure],
 /*024 - Staff_RAW*/ EEAAO_RAW.[Tenure days],
-/*025 - ROSTER_RAW*/ EEAAO_RAW.[LOB],
-/*026 - ROSTER_RAW*/ EEAAO_RAW.[LOB Group],
+/*025 - ROSTER_RAW3*/ EEAAO_RAW.[LOB],
+/*026 - ROSTER_RAW3*/ EEAAO_RAW.[LOB Group],
 /*027 - PremHday_RAW*/ EEAAO_RAW.[Holiday],
 /*028 - RAMCO_RAW*/ EEAAO_RAW.[Ramco_Code],
-/*029 - ROSTER_RAW*/ EEAAO_RAW.[Shift],
-/*030 - ROSTER_RAW*/ EEAAO_RAW.[Original_Shift],
-/*031 - ROSTER_RAW*/ EEAAO_RAW.[week_shift],
-/*032 - ROSTER_RAW*/ EEAAO_RAW.[week_off],
-/*033 - ROSTER_RAW*/ EEAAO_RAW.[Shift_definition],
-/*034 - ROSTER_RAW*/ EEAAO_RAW.[Shift_type],
-/*035 - ROSTER_RAW+RAMCO_RAW*/ EEAAO_RAW.[ATD_Mismatch],
-/*036 - ROSTER_RAW*/ EEAAO_RAW.[Gap_Shift],
-/*037 - ROSTER_RAW+RAMCO_RAW*/ EEAAO_RAW.[PO_Count(MTD)],
-/*038 - ROSTER_RAW+RAMCO_RAW*/ SUM(Case when (Case when EEAAO_RAW.[Ramco_Code] = 'PO' then 1 Else 0 End) = 1 Then EEAAO_RAW.[Approve OT(s)] Else 0 End) OVER (partition by EEAAO_RAW.[YEAR],EEAAO_RAW.[MONTH],EEAAO_RAW.[Emp ID] order by EEAAO_RAW.[Date]) AS [PO_Dur(MTD)],
-/*039 - ROSTER_RAW+RAMCO_RAW*/ Sum(Case when EEAAO_RAW.[Ramco_Code] <> 'PO' then EEAAO_RAW.[Approve OT(s)] Else 0 End) OVER (partition by EEAAO_RAW.[YEAR],EEAAO_RAW.[MONTH],EEAAO_RAW.[Emp ID] order by EEAAO_RAW.[Date]) AS [OT_Dur(MTD)],
-/*040 - ROSTER_RAW+RAMCO_RAW*/ Case when EEAAO_RAW.[Approve OT(s)] < EEAAO_RAW.[OT_Registered(s)] then 1 Else 0 End AS [OvertimeSufficient],
-/*041 - ROSTER_RAW+RAMCO_RAW*/ Case when EEAAO_RAW.[Ramco_Code] = 'PR' and EEAAO_RAW.[Approve OT(s)] > 14400 Then 1 when EEAAO_RAW.[Ramco_Code] = 'PO' and EEAAO_RAW.[Approve OT(s)] > 28800 Then 1 Else 0 End AS [OvertimeOverLimit],
+/*029 - ROSTER_RAW3*/ EEAAO_RAW.[Shift],
+/*030 - ROSTER_RAW3*/ EEAAO_RAW.[Original_Shift],
+/*031 - ROSTER_RAW3*/ EEAAO_RAW.[week_shift],
+/*032 - ROSTER_RAW3*/ EEAAO_RAW.[week_off],
+/*033 - ROSTER_RAW3*/ EEAAO_RAW.[Shift_definition],
+/*034 - ROSTER_RAW3*/ EEAAO_RAW.[Shift_type],
+/*035 - ROSTER_RAW3+RAMCO_RAW*/ EEAAO_RAW.[ATD_Mismatch],
+/*036 - ROSTER_RAW3*/ EEAAO_RAW.[Gap_Shift],
+/*037 - ROSTER_RAW3+RAMCO_RAW*/ EEAAO_RAW.[PO_Count(MTD)],
+/*038 - ROSTER_RAW3+RAMCO_RAW*/ SUM(Case when (Case when EEAAO_RAW.[Ramco_Code] = 'PO' then 1 Else 0 End) = 1 Then EEAAO_RAW.[Approve OT(s)] Else 0 End) OVER (partition by EEAAO_RAW.[YEAR],EEAAO_RAW.[MONTH],EEAAO_RAW.[Emp ID] order by EEAAO_RAW.[Date]) AS [PO_Dur(MTD)],
+/*039 - ROSTER_RAW3+RAMCO_RAW*/ Sum(Case when EEAAO_RAW.[Ramco_Code] <> 'PO' then EEAAO_RAW.[Approve OT(s)] Else 0 End) OVER (partition by EEAAO_RAW.[YEAR],EEAAO_RAW.[MONTH],EEAAO_RAW.[Emp ID] order by EEAAO_RAW.[Date]) AS [OT_Dur(MTD)],
+/*040 - ROSTER_RAW3+RAMCO_RAW*/ Case when EEAAO_RAW.[Approve OT(s)] < EEAAO_RAW.[OT_Registered(s)] then 1 Else 0 End AS [OvertimeSufficient],
+/*041 - ROSTER_RAW3+RAMCO_RAW*/ Case when EEAAO_RAW.[Ramco_Code] = 'PR' and EEAAO_RAW.[Approve OT(s)] > 14400 Then 1 when EEAAO_RAW.[Ramco_Code] = 'PO' and EEAAO_RAW.[Approve OT(s)] > 28800 Then 1 Else 0 End AS [OvertimeOverLimit],
 /*042 - RAMCO_RAW*/ EEAAO_RAW.[PR_Count(MTD)],
 /*043 - RAMCO_RAW*/ EEAAO_RAW.[OverConsecutive],
 /*044 - EPS_RAW4*/ EEAAO_RAW.[Login],
@@ -1022,7 +1139,7 @@ SELECT
 /*046 - LogoutCount*/ EEAAO_RAW.[Logout_Count],
 /*047 - EPS_RAW4*/ EEAAO_RAW.[Late-Soon],
 /*048 - EPS_RAW4+RAMCO_RAW*/ EEAAO_RAW.[PR<8.75],
-/*049 - EPS_RAW4+ROSTER_RAW*/ EEAAO_RAW.[LoggedInOnOffDay],
+/*049 - EPS_RAW4+ROSTER_RAW3*/ EEAAO_RAW.[LoggedInOnOffDay],
 /*050 - RegisteredOT_RAW*/ EEAAO_RAW.[OT_Registered(s)],
 /*051 - RegisteredOT_RAW*/ EEAAO_RAW.[OT_Registered_Type],
 /*052 - EPS_RAW+RegisteredOT_RAW*/ EEAAO_RAW.[Approve OT(s)],
@@ -1147,8 +1264,8 @@ SELECT
 /*171 - WpSummary_RAW*/ EEAAO_RAW.[Training Ploted(s)],
 /*172 - WpSummary_RAW*/ EEAAO_RAW.[Training_Offline Ploted(s)],
 /*173 - WpSummary_RAW*/ EEAAO_RAW.[Termination Ploted(s)],
-/*174 - ROSTER_RAW*/ EEAAO_RAW.[Attendance(s)],
-/*175 - ROSTER_RAW*/ ISNULL(EEAAO_RAW.[ScheduleSeconds(s)],0) + ISNULL(EEAAO_RAW.[OT_Registered(s)],0) AS [ScheduleSeconds(s)],
+/*174 - ROSTER_RAW3*/ EEAAO_RAW.[Attendance(s)],
+/*175 - ROSTER_RAW3*/ ISNULL(EEAAO_RAW.[ScheduleSeconds(s)],0) + ISNULL(EEAAO_RAW.[OT_Registered(s)],0) AS [ScheduleSeconds(s)],
 /*176 - EPS_RAW4*/ EEAAO_RAW.[StaffTime(s)],
 /*177 - EPS_RAW4*/ EEAAO_RAW.[Night_StaffTime(s)],
 /*178 - EPS_RAW4*/ EEAAO_RAW.[Day_StaffTime(s)],
@@ -1236,137 +1353,15 @@ SELECT
 /*260 - Target*/ [Quality - personalization tar],
 /*261 - Target*/ [Quality - proactivity tar],
 /*262 - Target*/ [Quality - resolution tar],
-/*263 - ROSTER_RAW*/ EEAAO_RAW.[ScheduleHours(H)],
-/*264 - ROSTER_RAW*/ EEAAO_RAW.[IO_Standard(H)],
-/*265 - ROSTER_RAW*/ EEAAO_RAW.[IO_Standard_ExcluBreak(H)],
-/*266 - ROSTER_RAW*/ EEAAO_RAW.[SchedLeave(H)],
-/*267 - ROSTER_RAW*/ EEAAO_RAW.[SchedUPL(H)]
+/*263 - ROSTER_RAW3*/ EEAAO_RAW.[ScheduleHours(H)],
+/*264 - ROSTER_RAW3*/ EEAAO_RAW.[IO_Standard(H)],
+/*265 - ROSTER_RAW3*/ EEAAO_RAW.[IO_Standard_ExcluBreak(H)],
+/*266 - ROSTER_RAW3*/ EEAAO_RAW.[SchedLeave(H)],
+/*267 - ROSTER_RAW3*/ EEAAO_RAW.[SchedUPL(H)]
 FROM EEAAO_RAW
 )
+SELECT * FROM EEAAO_RAW2;
 
-/*                                                           
-----------------------------------------------------------------------------------------------------------------------------------
---                                           ^                             ^                                                    --
---                                           |        IMPORT CODE HERE     |                                                    --
---                                           |                             |                                                    --
-----------------------------------------------------------------------------------------------------------------------------------
-*/
-    INSERT INTO BCOM.EEAAO (  -- Insert data to BCOM.EEAAO
-        [YEAR], [MONTH], [Date], [Week_num], [Week_day], [DPE_ID], [DPE_Name], [OM_ID], [OM_Name], 
-		[TL_ID], [TL_Name], [Emp ID], [Emp_Name], [Work Type], [Wave], [Booking Login ID], [TED Name], [cnx_email], 
-		[Booking Email], [CUIC Name], [PST_Start_Date], [Termination/Transfer], [Tenure], [Tenure days], 
-		[LOB], [LOB Group], [Holiday], [Ramco_Code], [Shift], [Original_Shift], [week_shift], [week_off], 
-		[Shift_definition], [Shift_type], [ATD_Mismatch], [Gap_Shift], [PO_Count(MTD)], [PO_Dur(MTD)], 
-		[OT_Dur(MTD)], [OvertimeSufficient], [OvertimeOverLimit], [PR_Count(MTD)], [OverConsecutive], 
-		[Login], [Logout], [Logout_Count], [Late-Soon], [PR<8.75], [LoggedInOnOffDay], [OT_Registered(s)], 
-		[OT_Registered_Type], [Approve OT(s)], [OT_Ramco(s)], [PH_Ramco(s)], [NSA_Ramco(s)], 
-		[NotLoggedOutAfterShift], [LoggedInBeforeShift], [LowPerf], [ExceptionReq(s)], [Total_Cases], 
-		[Total_#TED], [#TED_phone], [#TED_outbound_phone_call], [#TED_email], [#TED_Undefined], 
-		[#TED_messaging], [#TED_chat], [#TED_research], [Phone_#TED], [NonPhone_#TED], [Total_#PEGA], 
-		[#PEGA_email], [#PEGA_Undefined], [#PEGA_messaging], [#PEGA_phone], [#PEGA_chat], 
-		[#PEGA_outbound_phone_call], [#PEGA_research], [Phone_#PEGA], [NonPhone_#PEGA], [Total_#Swiveled], 
-		[#Swiveled_email], [#Swiveled_Undefined], [#Swiveled_messaging], [#Swiveled_phone], 
-		[#Swiveled_chat], [#Swiveled_outbound_phone_call], [#Swiveled_research], [Phone_#Swiveled], 
-		[NonPhone_#Swiveled], [#RONA], [AgentAvailTime(s)], [CUICLoggedTime(s)], [Productive(s)], 
-		[Night_Productive(s)], [Day_Productive(s)], [Downtime(s)], [Night_Downtime(s)], [Day_Downtime(s)], 
-		[Delivery(s)], [Night_Delivery(s)], [Day_Delivery(s)], [Handling_Time(s)], [Total_IB(s)], 
-		[Overall_AHT_Time], [Overall_AHT_Count], [AHT_Phone_time(s)], [AHT_Phone_Count], 
-		[AHT_NonPhone_time(s)], [AHT_NonPhone_Count], [Talk_Time(s)], [Talk_Count], [Wrap_Time(s)], 
-		[Wrap_Count], [Hold_Time(s)], [Hold_Count], [Phone_CSAT_TP], [Phone_Survey_TP], [NonPhone_CSAT_TP], 
-		[NonPhone_Survey_TP], [Phone_CSAT_RS], [Phone_Survey_RS], [NonPhone_CSAT_RS], [NonPhone_Survey_RS], 
-		[Phone_CSAT], [Phone_Survey], [NonPhone_CSAT], [NonPhone_Survey], [Csat Score], [Csat Survey], 
-		[Csat Score(UB)], [Csat Survey(UB)], [Csat Score(EN)], [Csat Survey(EN)], [Csat Score(XU)], 
-		[Csat Survey(XU)], [Csat Score(VI-CSG)], [Csat Survey(VI-CSG)], [Csat Score(VI-CSG Overall)], 
-		[Csat Survey(VI-CSG Overall)], [Psat_survey], [Psat_Score], [Psat_survey(VN)], [Psat_Score(VN)], 
-		[Psat_survey(Ame)], [Psat_Score(Ame)], [Psat_survey(Bri)], [Psat_Score(Bri)], [customer_score], 
-		[customer_weight], [business_score], [business_weight], [compliance_score], [compliance_weight], 
-		[personalization_score], [personalization_weight], [proactivity_score], [proactivity_weight], [resolution_score], [resolution_weight], 
-		[Total Ploted(s)], [Plotted Productive(s)], [Plotted Downtime(s)], [Plotted Phone(s)], 
-		[Plotted Picklist(s)], [Break_Offline Ploted(s)], [Lunch Ploted(s)], [Coaching Ploted(s)], 
-		[Team_Meeting Ploted(s)], [Break Ploted(s)], [Training Ploted(s)], [Training_Offline Ploted(s)], 
-		[Termination Ploted(s)], [Attendance(s)], [ScheduleSeconds(s)], [StaffTime(s)], [Night_StaffTime(s)], 
-		[Day_StaffTime(s)], [Break(s)], [Night_Break(s)], [Day_Break(s)], [Global_Support(s)], 
-		[Night_Global_Support(s)], [Day_Global_Support(s)], [Loaner(s)], [Night_Loaner(s)], [Day_Loaner(s)], 
-		[Lunch(s)], [Night_Lunch(s)], [Day_Lunch(s)], [Mass_Issue(s)], [Night_Mass_Issue(s)], [Day_Mass_Issue(s)], 
-		[Meeting(s)], [Night_Meeting(s)], [Day_Meeting(s)], [Moderation(s)], [Night_Moderation(s)], 
-		[Day_Moderation(s)], [New_Hire_Training(s)], [Night_New_Hire_Training(s)], [Day_New_Hire_Training(s)], 
-		[Not_Working_Yet(s)], [Night_Not_Working_Yet(s)], [Day_Not_Working_Yet(s)], [Payment_Processing(s)], 
-		[Night_Payment_Processing(s)], [Day_Payment_Processing(s)], [Personal_Time(s)], [Night_Personal_Time(s)], 
-		[Day_Personal_Time(s)], [Picklist_off_Phone(s)], [Night_Picklist_off_Phone(s)], [Day_Picklist_off_Phone(s)], 
-		[Project(s)], [Night_Project(s)], [Day_Project(s)], [RONA(s)], [Night_RONA(s)], [Day_RONA(s)], [Ready_Talking(s)], 
-		[Night_Ready_Talking(s)], [Day_Ready_Talking(s)], [Special_Task(s)], [Night_Special_Task(s)], [Day_Special_Task(s)], 
-		[Technical_Problems(s)], [Night_Technical_Problems(s)], [Day_Technical_Problems(s)], [Training(s)], 
-		[Night_Training(s)], [Day_Training(s)], [Unscheduled_Picklist(s)], [Night_Unscheduled_Picklist(s)], 
-		[Day_Unscheduled_Picklist(s)], [Work_Council(s)], [Night_Work_Council(s)], [Day_Work_Council(s)], [Overall CPH tar], 
-		[Phone CPH tar], [Non Phone CPH tar], [Quality - Customer Impact tar], [Quality - Business Impact tar], 
-		[Quality - Compliance Impact tar], [Quality - Overall tar], [AHT Phone tar], [AHT Non-phone tar], [AHT Overall tar], 
-		[Hold (phone) tar], [AACW (phone) tar], [Avg Talk Time tar], [Phone CSAT tar], [Non phone CSAT tar], [Overall CSAT tar], 
-		[PSAT tar], [PSAT Vietnamese tar], [PSAT English (American) tar], [PSAT English (Great Britain) tar], [CSAT Reso tar],
-		[Quality - personalization tar], [Quality - proactivity tar], [Quality - resolution tar],
-		[ScheduleHours(H)], [IO_Standard(H)], [IO_Standard_ExcluBreak(H)], [SchedLeave(H)], [SchedUPL(H)]
-    )
-    SELECT  -- Get Data from final CTE (EEAAO_RAW2)
-        [YEAR], [MONTH], [Date], [Week_num], [Week_day], [DPE_ID], [DPE_Name], [OM_ID], [OM_Name], 
-		[TL_ID], [TL_Name], [Emp ID], [Emp_Name], [Work Type], [Wave], [Booking Login ID], [TED Name], [cnx_email], 
-		[Booking Email], [CUIC Name], [PST_Start_Date], [Termination/Transfer], [Tenure], [Tenure days], 
-		[LOB], [LOB Group], [Holiday], [Ramco_Code], [Shift], [Original_Shift], [week_shift], [week_off], 
-		[Shift_definition], [Shift_type], [ATD_Mismatch], [Gap_Shift], [PO_Count(MTD)], [PO_Dur(MTD)], 
-		[OT_Dur(MTD)], [OvertimeSufficient], [OvertimeOverLimit], [PR_Count(MTD)], [OverConsecutive], 
-		[Login], [Logout], [Logout_Count], [Late-Soon], [PR<8.75], [LoggedInOnOffDay], [OT_Registered(s)], 
-		[OT_Registered_Type], [Approve OT(s)], [OT_Ramco(s)], [PH_Ramco(s)], [NSA_Ramco(s)], 
-		[NotLoggedOutAfterShift], [LoggedInBeforeShift], [LowPerf], [ExceptionReq(s)], [Total_Cases], 
-		[Total_#TED], [#TED_phone], [#TED_outbound_phone_call], [#TED_email], [#TED_Undefined], 
-		[#TED_messaging], [#TED_chat], [#TED_research], [Phone_#TED], [NonPhone_#TED], [Total_#PEGA], 
-		[#PEGA_email], [#PEGA_Undefined], [#PEGA_messaging], [#PEGA_phone], [#PEGA_chat], 
-		[#PEGA_outbound_phone_call], [#PEGA_research], [Phone_#PEGA], [NonPhone_#PEGA], [Total_#Swiveled], 
-		[#Swiveled_email], [#Swiveled_Undefined], [#Swiveled_messaging], [#Swiveled_phone], 
-		[#Swiveled_chat], [#Swiveled_outbound_phone_call], [#Swiveled_research], [Phone_#Swiveled], 
-		[NonPhone_#Swiveled], [#RONA], [AgentAvailTime(s)], [CUICLoggedTime(s)], [Productive(s)], 
-		[Night_Productive(s)], [Day_Productive(s)], [Downtime(s)], [Night_Downtime(s)], [Day_Downtime(s)], 
-		[Delivery(s)], [Night_Delivery(s)], [Day_Delivery(s)], [Handling_Time(s)], [Total_IB(s)], 
-		[Overall_AHT_Time], [Overall_AHT_Count], [AHT_Phone_time(s)], [AHT_Phone_Count], 
-		[AHT_NonPhone_time(s)], [AHT_NonPhone_Count], [Talk_Time(s)], [Talk_Count], [Wrap_Time(s)], 
-		[Wrap_Count], [Hold_Time(s)], [Hold_Count], [Phone_CSAT_TP], [Phone_Survey_TP], [NonPhone_CSAT_TP], 
-		[NonPhone_Survey_TP], [Phone_CSAT_RS], [Phone_Survey_RS], [NonPhone_CSAT_RS], [NonPhone_Survey_RS], 
-		[Phone_CSAT], [Phone_Survey], [NonPhone_CSAT], [NonPhone_Survey], [Csat Score], [Csat Survey], 
-		[Csat Score(UB)], [Csat Survey(UB)], [Csat Score(EN)], [Csat Survey(EN)], [Csat Score(XU)], 
-		[Csat Survey(XU)], [Csat Score(VI-CSG)], [Csat Survey(VI-CSG)], [Csat Score(VI-CSG Overall)], 
-		[Csat Survey(VI-CSG Overall)], [Psat_survey], [Psat_Score], [Psat_survey(VN)], [Psat_Score(VN)], 
-		[Psat_survey(Ame)], [Psat_Score(Ame)], [Psat_survey(Bri)], [Psat_Score(Bri)], [customer_score], 
-		[customer_weight], [business_score], [business_weight], [compliance_score], [compliance_weight],
-		[personalization_score], [personalization_weight], [proactivity_score], [proactivity_weight], [resolution_score], [resolution_weight],
-		[Total Ploted(s)], [Plotted Productive(s)], [Plotted Downtime(s)], [Plotted Phone(s)], 
-		[Plotted Picklist(s)], [Break_Offline Ploted(s)], [Lunch Ploted(s)], [Coaching Ploted(s)], 
-		[Team_Meeting Ploted(s)], [Break Ploted(s)], [Training Ploted(s)], [Training_Offline Ploted(s)], 
-		[Termination Ploted(s)], [Attendance(s)], [ScheduleSeconds(s)], [StaffTime(s)], [Night_StaffTime(s)], 
-		[Day_StaffTime(s)], [Break(s)], [Night_Break(s)], [Day_Break(s)], [Global_Support(s)], 
-		[Night_Global_Support(s)], [Day_Global_Support(s)], [Loaner(s)], [Night_Loaner(s)], [Day_Loaner(s)], 
-		[Lunch(s)], [Night_Lunch(s)], [Day_Lunch(s)], [Mass_Issue(s)], [Night_Mass_Issue(s)], [Day_Mass_Issue(s)], 
-		[Meeting(s)], [Night_Meeting(s)], [Day_Meeting(s)], [Moderation(s)], [Night_Moderation(s)], 
-		[Day_Moderation(s)], [New_Hire_Training(s)], [Night_New_Hire_Training(s)], [Day_New_Hire_Training(s)], 
-		[Not_Working_Yet(s)], [Night_Not_Working_Yet(s)], [Day_Not_Working_Yet(s)], [Payment_Processing(s)], 
-		[Night_Payment_Processing(s)], [Day_Payment_Processing(s)], [Personal_Time(s)], [Night_Personal_Time(s)], 
-		[Day_Personal_Time(s)], [Picklist_off_Phone(s)], [Night_Picklist_off_Phone(s)], [Day_Picklist_off_Phone(s)], 
-		[Project(s)], [Night_Project(s)], [Day_Project(s)], [RONA(s)], [Night_RONA(s)], [Day_RONA(s)], [Ready_Talking(s)], 
-		[Night_Ready_Talking(s)], [Day_Ready_Talking(s)], [Special_Task(s)], [Night_Special_Task(s)], [Day_Special_Task(s)], 
-		[Technical_Problems(s)], [Night_Technical_Problems(s)], [Day_Technical_Problems(s)], [Training(s)], 
-		[Night_Training(s)], [Day_Training(s)], [Unscheduled_Picklist(s)], [Night_Unscheduled_Picklist(s)], 
-		[Day_Unscheduled_Picklist(s)], [Work_Council(s)], [Night_Work_Council(s)], [Day_Work_Council(s)], [Overall CPH tar], 
-		[Phone CPH tar], [Non Phone CPH tar], [Quality - Customer Impact tar], [Quality - Business Impact tar], 
-		[Quality - Compliance Impact tar], [Quality - Overall tar], [AHT Phone tar], [AHT Non-phone tar], [AHT Overall tar], 
-		[Hold (phone) tar], [AACW (phone) tar], [Avg Talk Time tar], [Phone CSAT tar], [Non phone CSAT tar], [Overall CSAT tar], 
-		[PSAT tar], [PSAT Vietnamese tar], [PSAT English (American) tar], [PSAT English (Great Britain) tar], [CSAT Reso tar],
-		[Quality - personalization tar], [Quality - proactivity tar], [Quality - resolution tar],
-		[ScheduleHours(H)], [IO_Standard(H)], [IO_Standard_ExcluBreak(H)], [SchedLeave(H)], [SchedUPL(H)]
-    FROM EEAAO_RAW2; 
-    RAISERROR('Data insertion into BCOM.EEAAO completed.', 0, 1) WITH NOWAIT;
-    PRINT 'Fetching top 5 rows from BCOM.EEAAO as sample data...';
-	--Overview Sample Data
-	SELECT TOP 5 * FROM BCOM.EEAAO ORDER BY [Emp ID], [Date] DESC;
-    PRINT 'Procedure BCOM.Refresh_EEAAO_Data completed successfully.';
-    SET NOCOUNT OFF;
-END;
-GO
-
-
--- EXEC BCOM.Refresh_EEAAO_Data;
+--USE wfm_vn_dev
+--SET SHOWPLAN_ALL ON
+--SET SHOWPLAN_ALL OFF
