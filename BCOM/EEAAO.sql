@@ -776,22 +776,22 @@ ISNULL((CASE
 --When OT_Regisster <= 0 or Ramco not in [PH,PR,PO] then 0
 WHEN ISNULL(RegisteredOT_RAW.[OT_Registered(s)],0) <= 0 or RAMCO_RAW.[Ramco_Code] not in ('PH','PR','PO') THEN 0
 --WHen Extra rendered hours >= 0 then OT_Regisster
-WHEN 
+WHEN
 --Extra rendered = Delivery + Break + Exception - STANDARD
-((ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Meeting(s)],0) + 
+((ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Special_Task(s)],0) + ISNULL(EPS_RAW4.[Meeting(s)],0) + 
   ISNULL(EPS_RAW4.[Training(s)],0) + ISNULL(EPS_RAW4.[New_Hire_Training(s)],0) + ISNULL(EPS_RAW4.[Break(s)],0) + ISNULL(ExceptionReq_RAW.[Req_Second],0)) - 
 --STANDARD
 (CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PR' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW.[Original_Shift] <> 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] + (8*3600)
       WHEN RAMCO_RAW.[Ramco_Code] = 'PO' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW.[Original_Shift] = 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] ELSE 0 END)) >= 0 THEN RegisteredOT_RAW.[OT_Registered(s)]
 --When OT_Regisster + Extra_rendered_hours < 0 then 0
       WHEN RegisteredOT_RAW.[OT_Registered(s)] + --Extra rendered hours
-((ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Meeting(s)],0) + 
+((ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Special_Task(s)],0) + ISNULL(EPS_RAW4.[Meeting(s)],0) + 
   ISNULL(EPS_RAW4.[Training(s)],0) + ISNULL(EPS_RAW4.[New_Hire_Training(s)],0) + ISNULL(EPS_RAW4.[Break(s)],0) + ISNULL(ExceptionReq_RAW.[Req_Second],0)) - 
 (CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PR' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW.[Original_Shift] <> 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] + (8*3600)
       WHEN RAMCO_RAW.[Ramco_Code] = 'PO' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW.[Original_Shift] = 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] ELSE 0 END)) < 0 THEN 0
 --else  OT_Regisster + Extra_rendered_hours 
       ELSE RegisteredOT_RAW.[OT_Registered(s)] + --Extra rendered hours
-((ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Meeting(s)],0) + 
+((ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Special_Task(s)],0) + ISNULL(EPS_RAW4.[Meeting(s)],0) + 
   ISNULL(EPS_RAW4.[Training(s)],0) + ISNULL(EPS_RAW4.[New_Hire_Training(s)],0) + ISNULL(EPS_RAW4.[Break(s)],0) + ISNULL(ExceptionReq_RAW.[Req_Second],0)) - 
 (CASE WHEN RAMCO_RAW.[Ramco_Code] = 'PR' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW.[Original_Shift] <> 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] + (8*3600)
       WHEN RAMCO_RAW.[Ramco_Code] = 'PO' Or (RAMCO_RAW.[Ramco_Code] = 'PH' AND ROSTER_RAW.[Original_Shift] = 'OFF') THEN RegisteredOT_RAW.[OT_Registered(s)] ELSE 0 END)) END),0) AS [Approve OT(s)],
@@ -826,8 +826,8 @@ Else Null End) Then 1 Else 0 End as [LoggedInBeforeShift],
 Case when
 ISNULL(CPI_RAW3.[Total_Cases],0)/
 CASE 
-    WHEN ISNULL(CASE WHEN   (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +   ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0)) = 0 THEN 1    ELSE     (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +  ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0)) END ,0)/3600 = 0 THEN 1  -- Thay 1 bằng giá trị mặc định
-    ELSE ISNULL(CASE WHEN   (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +   ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0)) = 0 THEN 1    ELSE     (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +  ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0)) END ,0)/3600
+    WHEN ISNULL(CASE WHEN   (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Special_Task(s)],0)) = 0 THEN 1    ELSE     (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Special_Task(s)],0)) END ,0)/3600 = 0 THEN 1 
+    ELSE ISNULL(CASE WHEN   (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Special_Task(s)],0)) = 0 THEN 1    ELSE     (ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Special_Task(s)],0)) END ,0)/3600
 END
 < 2    AND RAMCO_RAW.[Ramco_Define] = 'WORK' THEN 1 ELSE 0 END AS [LowPerf],
 ISNULL(ExceptionReq_RAW.[Req_Second],0) AS [ExceptionReq(s)],
@@ -843,20 +843,17 @@ ISNULL(CPI_RAW3.[#Swiveled_phone],0)+ISNULL(CPI_RAW3.[#Swiveled_outbound_phone_c
 ISNULL(CPI_RAW3.[#Swiveled_email],0)+ISNULL(CPI_RAW3.[#Swiveled_Undefined],0)+ISNULL(CPI_RAW3.[#Swiveled_messaging],0)+ISNULL(CPI_RAW3.[#Swiveled_chat],0)+ISNULL(CPI_RAW3.[#Swiveled_research],0) AS [NonPhone_#Swiveled],
 ISNULL(RONA_RAW2.[#RONA],0) AS [#RONA], ISNULL(CUIC_RAW2.[AgentAvailTime(s)],0) AS [AgentAvailTime(s)], ISNULL(CUIC_RAW2.[CUICLoggedTime(s)],0) AS [CUICLoggedTime(s)],
 /*Productive Hour*/
-ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[RONA(s)],0) + ISNULL(EPS_RAW4.[Unscheduled_Picklist(s)],0) +
-ISNULL(EPS_RAW4.[Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Project(s)],0) + ISNULL(EPS_RAW4.[Special_Task(s)],0) AS [Productive(s)],
-ISNULL(EPS_RAW4.[Night_Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Night_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Night_RONA(s)],0) + ISNULL(EPS_RAW4.[Night_Unscheduled_Picklist(s)],0) +
-ISNULL(EPS_RAW4.[Night_Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Night_Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Night_Project(s)],0) + ISNULL(EPS_RAW4.[Night_Special_Task(s)],0) AS [Night_Productive(s)],
-ISNULL(EPS_RAW4.[Day_Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Day_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Day_RONA(s)],0) + ISNULL(EPS_RAW4.[Day_Unscheduled_Picklist(s)],0) +
-ISNULL(EPS_RAW4.[Day_Payment_Processing(s)],0) + ISNULL(EPS_RAW4.[Day_Mass_Issue(s)],0) + ISNULL(EPS_RAW4.[Day_Project(s)],0) + ISNULL(EPS_RAW4.[Day_Special_Task(s)],0) AS [Day_Productive(s)],
+ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Special_Task(s)],0) AS [Productive(s)],
+ISNULL(EPS_RAW4.[Night_Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Night_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Night_Special_Task(s)],0) AS [Night_Productive(s)],
+ISNULL(EPS_RAW4.[Day_Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Day_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Day_Special_Task(s)],0) AS [Day_Productive(s)],
 /*DownTime Hour*/
-ISNULL(EPS_RAW4.[Meeting(s)],0) + ISNULL(EPS_RAW4.[Training(s)],0) AS [Downtime(s)],
-ISNULL(EPS_RAW4.[Night_Meeting(s)],0) + ISNULL(EPS_RAW4.[Night_Training(s)],0) AS [Night_Downtime(s)],
-ISNULL(EPS_RAW4.[Day_Meeting(s)],0) + ISNULL(EPS_RAW4.[Day_Training(s)],0) AS [Day_Downtime(s)],
+ISNULL(EPS_RAW4.[Meeting(s)],0) + ISNULL(EPS_RAW4.[Training(s)],0) + ISNULL(EPS_RAW4.[New_Hire_Training(s)],0) AS [Downtime(s)],
+ISNULL(EPS_RAW4.[Night_Meeting(s)],0) + ISNULL(EPS_RAW4.[Night_Training(s)],0) + ISNULL(EPS_RAW4.[Night_New_Hire_Training(s)],0) AS [Night_Downtime(s)],
+ISNULL(EPS_RAW4.[Day_Meeting(s)],0) + ISNULL(EPS_RAW4.[Day_Training(s)],0) + ISNULL(EPS_RAW4.[Day_New_Hire_Training(s)],0) AS [Day_Downtime(s)],
 /*Delivery Hour*/
-ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Meeting(s)],0) + ISNULL(EPS_RAW4.[Training(s)],0) AS [Delivery(s)],
-ISNULL(EPS_RAW4.[Night_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Night_Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Night_Meeting(s)],0) + ISNULL(EPS_RAW4.[Night_Training(s)],0) AS [Night_Delivery(s)],
-ISNULL(EPS_RAW4.[Day_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Day_Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Day_Meeting(s)],0) + ISNULL(EPS_RAW4.[Day_Training(s)],0) AS [Day_Delivery(s)],
+ISNULL(EPS_RAW4.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Special_Task(s)],0) + ISNULL(EPS_RAW4.[Meeting(s)],0) + ISNULL(EPS_RAW4.[Training(s)],0) + ISNULL(EPS_RAW4.[New_Hire_Training(s)],0) AS [Delivery(s)],
+ISNULL(EPS_RAW4.[Night_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Night_Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Night_Special_Task(s)],0) + ISNULL(EPS_RAW4.[Night_Meeting(s)],0) + ISNULL(EPS_RAW4.[Night_Training(s)],0) + ISNULL(EPS_RAW4.[Night_New_Hire_Training(s)],0) AS [Night_Delivery(s)],
+ISNULL(EPS_RAW4.[Day_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW4.[Day_Ready_Talking(s)],0) + ISNULL(EPS_RAW4.[Day_Special_Task(s)],0) + ISNULL(EPS_RAW4.[Day_Meeting(s)],0) + ISNULL(EPS_RAW4.[Day_Training(s)],0) + ISNULL(EPS_RAW4.[Day_New_Hire_Training(s)],0) AS [Day_Delivery(s)],
 AHT_RAW.[Handling_Time(s)], AHT_RAW.[Total_IB(s)], AHT_RAW.[Overall_AHT_Time], AHT_RAW.[Overall_AHT_Count], AHT_RAW.[AHT_Phone_time(s)], AHT_RAW.[AHT_Phone_Count], AHT_RAW.[AHT_NonPhone_time(s)], 
 AHT_RAW.[AHT_NonPhone_Count], AHT_RAW.[Talk_Time(s)], AHT_RAW.[Talk_Count], AHT_RAW.[Wrap_Time(s)], AHT_RAW.[Wrap_Count], AHT_RAW.[Hold_Time(s)], AHT_RAW.[Hold_Count], 
 CSAT_CMB_RAW2.[Phone_CSAT_TP], CSAT_CMB_RAW2.[Phone_Survey_TP], CSAT_CMB_RAW2.[NonPhone_CSAT_TP], CSAT_CMB_RAW2.[NonPhone_Survey_TP], CSAT_CMB_RAW2.[Phone_CSAT_RS], CSAT_CMB_RAW2.[Phone_Survey_RS], 
