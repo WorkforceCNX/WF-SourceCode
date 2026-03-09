@@ -314,10 +314,11 @@ Actual As (
 Select
 EPS_RAW4.[Date], ROSTER_RAW2.[LOB],
 (
-SUM(ISNULL(CAST(EPS_RAW4.[Ready_Talking(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Picklist_off_Phone(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[RONA(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Unscheduled_Picklist(s)] AS DECIMAL),0)) +
-SUM(ISNULL(CAST(EPS_RAW4.[Payment_Processing(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Mass_Issue(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Project(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Special_Task(s)] AS DECIMAL),0))
+SUM(ISNULL(CAST(EPS_RAW4.[Ready_Talking(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Picklist_off_Phone(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Special_Task(s)] AS DECIMAL),0))
 )/3600 AS [Act_Prod(H)],
-(SUM(ISNULL(CAST(EPS_RAW4.[Meeting(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Training(s)] AS DECIMAL),0)))/3600 AS [Act_Downtime(H)]
+(
+SUM(ISNULL(CAST(EPS_RAW4.[Meeting(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[Training(s)] AS DECIMAL),0)) + SUM(ISNULL(CAST(EPS_RAW4.[New_Hire_Training(s)] AS DECIMAL),0)) 
+)/3600 AS [Act_Downtime(H)]
 From EPS_RAW4
 LEFT JOIN ROSTER_RAW2 ON EPS_RAW4.[Date] = ROSTER_RAW2.[Date] AND EPS_RAW4.[Employee_ID] = ROSTER_RAW2.[Emp ID]
 WHERE ROSTER_RAW2.[LOB] Is Not Null And ROSTER_RAW2.[Shift] <> 'New Hire Training'
@@ -439,4 +440,4 @@ Left Join RosterOT On DailyReq.[Date] = RosterOT.[Date] And DailyReq.[LOB] = Ros
 Left Join Actual On DailyReq.[Date] = Actual.[Date] And DailyReq.[LOB] = Actual.[LOB]
 Left Join CUIC_RAW3 On DailyReq.[Date] = CUIC_RAW3.[Session Date] And DailyReq.[LOB] = CUIC_RAW3.[LOB]
 )
-SELECT * FROM JEOPARDY
+SELECT * FROM JEOPARDY WHERE [Date] >= '2026-01-01'

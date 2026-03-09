@@ -125,4 +125,4 @@ BEGIN
 END;
 
 ;
-EXEC BCOM.usp_MaintainDatabase
+--EXEC BCOM.usp_MaintainDatabase

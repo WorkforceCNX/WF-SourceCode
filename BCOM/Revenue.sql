@@ -311,12 +311,12 @@ ROSTER_RAW3.[LOB], EPS_RAW3.[Date], PremHday_RAW.[Holiday],
 Sum(Case When ISNULL(RAMCO_RAW.[Ramco_Code],'NM') <> 'PH' Then (
 ISNULL(EPS_RAW3.[Night_Ready_Talking(s)],0) + ISNULL(EPS_RAW3.[Night_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW3.[Night_RONA(s)],0) + 
 ISNULL(EPS_RAW3.[Night_Unscheduled_Picklist(s)],0) + ISNULL(EPS_RAW3.[Night_Payment_Processing(s)],0) + ISNULL(EPS_RAW3.[Night_Mass_Issue(s)],0) + 
-ISNULL(EPS_RAW3.[Night_Project(s)],0) 
+ISNULL(EPS_RAW3.[Night_Project(s)],0) + ISNULL(EPS_RAW3.[Night_Special_Task(s)],0)
 ) Else 0 End)/3600 AS [ACT_Night_Productive],
 Sum(Case When ISNULL(RAMCO_RAW.[Ramco_Code],'NM') <> 'PH' Then (
 ISNULL(EPS_RAW3.[Day_Ready_Talking(s)],0) + ISNULL(EPS_RAW3.[Day_Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW3.[Day_RONA(s)],0) + 
 ISNULL(EPS_RAW3.[Day_Unscheduled_Picklist(s)],0) + ISNULL(EPS_RAW3.[Day_Payment_Processing(s)],0) + ISNULL(EPS_RAW3.[Day_Mass_Issue(s)],0) + 
-ISNULL(EPS_RAW3.[Day_Project(s)],0)
+ISNULL(EPS_RAW3.[Day_Project(s)],0) + ISNULL(EPS_RAW3.[Day_Special_Task(s)],0)
 ) Else 0 End)/3600 AS [ACT_Day_Productive],
 Sum(Case When ISNULL(RAMCO_RAW.[Ramco_Code],'NM') <> 'PH' Then (ISNULL(EPS_RAW3.[Night_Meeting(s)],0) + ISNULL(EPS_RAW3.[Night_Training(s)],0)) Else 0 End)/3600 AS [ACT_Night_Downtime],
 Sum(Case When ISNULL(RAMCO_RAW.[Ramco_Code],'NM') <> 'PH' Then (ISNULL(EPS_RAW3.[Day_Meeting(s)],0) + ISNULL(EPS_RAW3.[Day_Training(s)],0) ) Else 0 End)/3600 AS [ACT_Day_Downtime],
@@ -326,7 +326,7 @@ Sum(Case When ISNULL(RAMCO_RAW.[Ramco_Code],'NM') = 'PH' Then (
 ISNULL(EPS_RAW3.[Ready_Talking(s)],0) + ISNULL(EPS_RAW3.[Picklist_off_Phone(s)],0) + ISNULL(EPS_RAW3.[RONA(s)],0) + 
 ISNULL(EPS_RAW3.[Unscheduled_Picklist(s)],0) + ISNULL(EPS_RAW3.[Payment_Processing(s)],0) + ISNULL(EPS_RAW3.[Mass_Issue(s)],0) + 
 ISNULL(EPS_RAW3.[Project(s)],0) + ISNULL(EPS_RAW3.[Meeting(s)],0) + ISNULL(EPS_RAW3.[Training(s)],0) + ISNULL(EPS_RAW3.[New_Hire_Training(s)],0) +
-ISNULL(RegisteredOT_RAW.[OT_Registered(s)],0)
+ISNULL(RegisteredOT_RAW.[OT_Registered(s)],0) + ISNULL(EPS_RAW3.[Special_Task(s)],0)
 ) Else 0 End)/3600 AS [ACT_PH]
 From EPS_RAW3
 LEFT JOIN RAMCO_RAW ON EPS_RAW3.[Date] = RAMCO_RAW.[Date] AND EPS_RAW3.[Employee_ID] = RAMCO_RAW.[EID]
