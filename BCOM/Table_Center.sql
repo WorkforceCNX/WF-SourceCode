@@ -1184,3 +1184,72 @@ Schedule_ID INT IDENTITY(1,1) PRIMARY KEY
 
 Select Top 10 * From BCOM.Schedule
 ---------------------------------------------------------
+
+/*BCOM.CPI_Gato*/
+CREATE TABLE BCOM.CPI_Gato (
+[FileName] VARCHAR(50) NULL,
+[ModifiedDate] DATETIME NULL,
+[Ted Name] VARCHAR(200) NOT NULL,  --🚫
+[Attribute] DATE NOT NULL,  --🚫
+[Value] float(53) NULL
+);
+
+Select Top 10 * From BCOM.CPI_Gato
+---------------------------------------------------------
+
+/*BCOM.CSP_Tracker*/
+CREATE TABLE BCOM.CSP_Tracker (
+[FileName] VARCHAR(50) NULL,
+[ModifiedDate] DATETIME NULL,
+[Id] float(53) NULL,
+[Thời gian bắt đầu] DATETIME NULL,
+[Thời gian hoàn thành] DATETIME NULL,
+[Email] VARCHAR(MAX) NULL,
+[Tên] VARCHAR(MAX) NULL,
+[Property ID] VARCHAR(MAX) NULL,
+[Skip or handle] VARCHAR(MAX) NULL,
+[Skip reason ?] VARCHAR(MAX) NULL,
+[Group LOB] VARCHAR(250) NULL,
+[UB Tool ?] VARCHAR(250) NULL,
+[Did you use the template from "CSP Template Tool" ?] VARCHAR(250) NULL,
+[Contact Type] VARCHAR(250) NULL,
+[Language] VARCHAR(250) NULL,
+[Contact party] VARCHAR(250) NULL,
+[Transferred to VICSG] VARCHAR(250) NULL,
+[Property type] VARCHAR(250) NULL,
+[Topic] VARCHAR(MAX) NULL,
+[Availability] VARCHAR(MAX) NULL,
+[Campaigns] VARCHAR(MAX) NULL,
+[Commercial Performance] VARCHAR(MAX) NULL,
+[Complaints] VARCHAR(MAX) NULL,
+[Compliance] VARCHAR(MAX) NULL,
+[Description and photo] VARCHAR(MAX) NULL,
+[Extranet account] VARCHAR(MAX) NULL,
+[Finance] VARCHAR(MAX) NULL,
+[Fraud & Phishing] VARCHAR(MAX) NULL,
+[Guest reviews] VARCHAR(MAX) NULL,
+[New Partnerships] VARCHAR(MAX) NULL,
+[Non-CSP subtopics] VARCHAR(MAX) NULL,
+[Partner Compensation] VARCHAR(MAX) NULL,
+[Payments by Booking] VARCHAR(MAX) NULL,
+[Policies and conditions] VARCHAR(MAX) NULL,
+[Property details] VARCHAR(MAX) NULL,
+[Rates] VARCHAR(MAX) NULL,
+[Reservation related] VARCHAR(MAX) NULL,
+[Room details] VARCHAR(MAX) NULL,
+[Amenities and facilities] VARCHAR(MAX) NULL,
+[The KYP status of the property] VARCHAR(MAX) NULL,
+[The solution you provided to partner with Guest Review] VARCHAR(MAX) NULL,
+[The BHFS status of the property] VARCHAR(MAX) NULL,
+[Status] VARCHAR(MAX) NULL,
+[Multiple Tickets] VARCHAR(MAX) NULL,
+[Complicated Case] VARCHAR(MAX) NULL,
+[Contact Senior] VARCHAR(MAX) NULL,
+[Callback to Partner] VARCHAR(MAX) NULL,
+[How many days are delayed due to the backlog?] VARCHAR(MAX) NULL,
+[Review Case Duration (Second - Number Only - For UB CSP Only)] VARCHAR(MAX) NULL,
+[Handle Case Duration (Second - Number Only)] VARCHAR(MAX) NULL
+);
+
+Select Top 10 * From BCOM.CSP_Tracker
+---------------------------------------------------------
