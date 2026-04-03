@@ -790,6 +790,7 @@ CREATE TABLE BCOM.ROSTER (
 [OM] VARCHAR(50) NULL,
 [DPE] VARCHAR(50) NULL,
 [Work Type] VARCHAR(50) NOT NULL, --🚫
+[QA] NVARCHAR(200) NULL,
 ROSTER_ID INT IDENTITY(1,1) PRIMARY KEY
 );
 
@@ -861,6 +862,7 @@ CREATE TABLE BCOM.Staff (
 [serial_number] VARCHAR(50) NULL,
 [BKN_ID] VARCHAR(50) NULL,
 [Extension Number] VARCHAR(50) NULL,
+[Gender] VARCHAR(50) NULL,
 Staff_ID INT IDENTITY(1,1) PRIMARY KEY
 );
 
@@ -1252,4 +1254,64 @@ CREATE TABLE BCOM.CSP_Tracker (
 );
 
 Select Top 10 * From BCOM.CSP_Tracker
+---------------------------------------------------------
+
+/*BCOM.JKT_ROSTER*/
+CREATE TABLE BCOM.JKT_ROSTER (
+[FileName] VARCHAR(50) NULL,
+[ModifiedDate] DATETIME NULL,
+[Emp ID] VARCHAR(50) NULL,
+[Name] NVARCHAR(50) NULL,
+[Attribute] DATE NULL,
+[Value] VARCHAR(50) NULL,
+[LOB] VARCHAR(50) NULL,
+[team_leader] VARCHAR(50) NULL,
+[week_shift] VARCHAR(50) NULL,
+[week_off] VARCHAR(50) NULL,
+[OM] VARCHAR(50) NULL,
+[DPE] VARCHAR(50) NULL,
+[Work Type] VARCHAR(50) NOT NULL, --🚫
+[QA] NVARCHAR(200) NULL,
+ROSTER_ID INT IDENTITY(1,1) PRIMARY KEY
+);
+
+Select Top 10 * From BCOM.JKT_ROSTER
+---------------------------------------------------------
+
+/*BCOM.JKT_Staff*/
+CREATE TABLE BCOM.JKT_Staff (
+[FileName] VARCHAR(50) NULL,
+[ModifiedDate] DATETIME NULL,
+[Employee_ID] VARCHAR(50) NOT NULL UNIQUE, --🚫
+[GEO] VARCHAR(50) NULL,
+[Site_ID] VARCHAR(50) NULL,
+[Employee_Last_Name] NVARCHAR(50) NULL,
+[Employee_First_Name] NVARCHAR(50) NULL,
+[Status] VARCHAR(50) NULL,
+[Wave #] VARCHAR(50) NULL,
+[Role] VARCHAR(50) NULL,
+[Booking Login ID] VARCHAR(50) NULL,
+[Language Start Date] DATE NULL,
+[TED Name] VARCHAR(50) NULL,
+[CUIC Name] VARCHAR(50) NULL,
+[EnterpriseName] VARCHAR(100) NULL,
+[Hire_Date] DATE NULL,
+[PST_Start_Date] DATE NULL,
+[Production_Start_Date] DATE NULL,
+[LWD] DATE NULL,
+[Termination_Date] DATE NULL,
+[Designation] VARCHAR(50) NULL,
+[cnx_email] VARCHAR(100) NULL,
+[Booking Email] VARCHAR(100) NULL,
+[WAH Category] VARCHAR(50) NULL,
+[Full name] NVARCHAR(100) NULL,
+[IEX] VARCHAR(50) NULL,
+[serial_number] VARCHAR(50) NULL,
+[BKN_ID] VARCHAR(50) NULL,
+[Extension Number] VARCHAR(50) NULL,
+[Gender] VARCHAR(50) NULL,
+[Staff_ID] INT IDENTITY(1,1) PRIMARY KEY
+);
+
+Select Top 10 * From BCOM.JKT_Staff
 ---------------------------------------------------------
