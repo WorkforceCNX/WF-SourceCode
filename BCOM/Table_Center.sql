@@ -484,7 +484,8 @@ CREATE TABLE BCOM.EEAAO (
 [IO_Standard_ExcluBreak(H)] INT NULL,
 [SchedLeave(H)] INT NULL,
 [SchedUPL(H)] INT NULL,
-EEAAO_ID INT IDENTITY(1,1) PRIMARY KEY
+EEAAO_ID INT IDENTITY(1,1) PRIMARY KEY,
+[Site] VARCHAR(50) NULL
 );
 
 Select Top 10 * From BCOM.EEAAO
@@ -694,12 +695,77 @@ CREATE TABLE BCOM.PSAT (
 [Channel] VARCHAR(50) NULL,
 [Hotel Id] VARCHAR(50) NULL,
 ["Comment"] VARCHAR(50) NULL,
-[Has Comment] VARCHAR(50) NULL,
+[Has Comment] VARCHAR(MAX) NULL,
 [Sorted BY Dimension (copy)] float(53) NULL,
 PSAT_ID INT IDENTITY(1,1) PRIMARY KEY
 );
 
 Select Top 10 * From BCOM.PSAT
+
+[Agent Comment Score]
+[PSAT-R Score]
+[Comment]
+[Subtopic]
+[Booking Product Type]
+[Channel to Report]
+[Ticket ID]
+[Reservation ID]
+[Team Lead Name]
+[CSM Name]
+[Site Lead Name]
+[Vendor]
+[Office Region]
+[Agent Username]
+[Team Lead Username]
+[CSM Username]
+[Site Lead Username]
+[CRM]
+[Customer Country]
+[Payments by Booking]
+[Property Country]
+[Property Type]
+[Site Name]
+[Site Code]
+[Duration (in seconds)]
+[Recorded Date (+00:00 GMT)]
+[Home or Core]
+[Staff ID]
+[Booking Region]
+[Booker Region]
+[Answered Datetime (+00:00 GMT)]
+[Star Rating]
+[Ease of Resolve Score]
+[Property Region]
+[Property Segment]
+[Is Managed]
+[Is Connected Partner]
+[Payout Method]
+[Payment Segment]
+[Payout Frequency]
+[Is High Value Property]
+[Partner Age]
+[Property Service Level]
+[First Open Bookable Date (+00:00 GMT)]
+[Is BFHS Registered]
+[Legal Entity ID]
+[Know Your Partner Status]
+[Communication Direction]
+[Was Resolved]
+[Property Name]
+[Property Name (English)]
+[Property City]
+[Property City (English]
+[Contractor Name]
+[Current Status]
+[Is Active]
+[Agent Start Date (+00:00 GMT)]
+[_cachedDate (+00:00 GMT)]
+[_recordId]
+[_recordedDate (+00:00 GMT)]
+[_sourceId]
+[_sourceMapId]
+[_sourceType]
+
 ---------------------------------------------------------
 
 /*BCOM.Quality*/
@@ -1181,7 +1247,8 @@ CREATE TABLE BCOM.Schedule (
 [LOB Group] VARCHAR(50) NULL, 
 [ScheduleSeconds(s)] float(53) NULL, 
 [Work Type] VARCHAR(50) NULL,
-Schedule_ID INT IDENTITY(1,1) PRIMARY KEY
+Schedule_ID INT IDENTITY(1,1) PRIMARY KEY,
+[Site] VARCHAR(50) NULL
 );
 
 Select Top 10 * From BCOM.Schedule

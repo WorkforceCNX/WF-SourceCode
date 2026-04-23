@@ -1,10 +1,26 @@
 WITH
 -- Create BCOM.Staff
-Staff_RAW AS ( SELECT [Employee_ID], [Wave #], [Role], [Booking Login ID], [Language Start Date], [TED Name], [CUIC Name], [EnterpriseName], [Hire_Date], [PST_Start_Date], [Production_Start_Date], [Designation], [cnx_email], [Booking Email], [Full name], [IEX], [serial_number], [BKN_ID], [Extension Number] FROM BCOM.Staff ),
+Staff_RAW AS ( 
+SELECT [Employee_ID], [Wave #], [Role], [Booking Login ID], [Language Start Date], [TED Name], [CUIC Name], [EnterpriseName], [Hire_Date], [PST_Start_Date], [Production_Start_Date], [Designation], [cnx_email], [Booking Email], [Full name], [IEX], [serial_number], [BKN_ID], [Extension Number] FROM BCOM.Staff
+Union All
+SELECT [Employee_ID], [Wave #], [Role], [Booking Login ID], [Language Start Date], [TED Name], [CUIC Name], [EnterpriseName], [Hire_Date], [PST_Start_Date], [Production_Start_Date], [Designation], [cnx_email], [Booking Email], [Full name], [IEX], [serial_number], [BKN_ID], [Extension Number] FROM BCOM.JKT_Staff
+),
 -- Create TL,OM,DPE
-TL_RAW AS (SELECT [Employee_ID],[TED Name] AS [TL_Name] FROM BCOM.Staff),
-OM_RAW AS (SELECT [Employee_ID],[TED Name] AS [OM_Name] FROM BCOM.Staff),
-DPE_RAW AS (SELECT [Employee_ID],[TED Name] AS [DPE_Name] FROM BCOM.Staff),
+TL_RAW AS (
+SELECT [Employee_ID],[TED Name] AS [TL_Name] FROM BCOM.Staff
+Union All
+SELECT [Employee_ID],[TED Name] AS [TL_Name] FROM BCOM.JKT_Staff
+),
+OM_RAW AS (
+SELECT [Employee_ID],[TED Name] AS [OM_Name] FROM BCOM.Staff
+Union All
+SELECT [Employee_ID],[TED Name] AS [OM_Name] FROM BCOM.JKT_Staff
+),
+DPE_RAW AS (
+SELECT [Employee_ID],[TED Name] AS [DPE_Name] FROM BCOM.Staff
+Union All
+SELECT [Employee_ID],[TED Name] AS [DPE_Name] FROM BCOM.JKT_Staff
+),
 -- Create GLB.Termination
 TERMINATION_RAW AS ( SELECT [EMPLOYEE_ID], [LWD], [Termination Reason] FROM GLB.Termination WHERE [Client Name ( Process )] = 'Bookingcom' And [JOB_ROLE] = 'Agent' And [COUNTRY] = 'Vietnam' And [LWD] >= '2023-01-01' ),
 -- Create GLB.Resignation
@@ -14,7 +30,11 @@ TRANSFER_RAW AS ( SELECT [EID], [LWD], [Remarks] FROM BCOM.LTTransfers WHERE [LW
 -- Create GLB.RAMCO
 RAMCO_RAW AS ( SELECT [EID], [Date], [Code] AS [Ramco_Code], CASE WHEN [Code] in ('PH','PO','PR','PI','POWH','HAL','HLWP','HSL') THEN 'WORK' WHEN [Code] IS NULL THEN NULL ELSE 'OFF' END AS [Ramco_Define] FROM GLB.RAMCO ),
 -- Create BCOM.ROSTER
-ROSTER_RAW AS ( SELECT [Emp ID], [Attribute], [Value], [LOB], [team_leader], [week_shift], [week_off], [OM], [DPE], [Work Type] FROM BCOM.ROSTER WHERE [Attribute] >= '2023-01-01' ),
+ROSTER_RAW AS ( 
+SELECT [Emp ID], [Attribute], [Value], [LOB], [team_leader], [week_shift], [week_off], [OM], [DPE], [Work Type], 'HCM' AS [Site] FROM BCOM.ROSTER WHERE [Attribute] >= '2023-01-01' 
+Union All
+SELECT [Emp ID], [Attribute], [Value], [LOB], [team_leader], [week_shift], [week_off], [OM], [DPE], [Work Type], 'JKT' AS [Site] FROM BCOM.JKT_ROSTER WHERE [Attribute] >= '2026-01-01'
+),
 -- Create BCOM.ROSTER 2 (Add: Shift)
 ROSTER_RAW2 AS (
 SELECT
@@ -43,7 +63,7 @@ SELECT
 			'1500-0000', '1600-0100', '1700-0200', '1800-0300', '1900-0400', '2000-0500', '2100-0600', '2200-0700', '2300-0800', --Original Fulltime shift
 			'1200-0000','1400-0400','1600-0000','1700-0000','1800-0000','1800-0000','1900-0000','1900-0100','1900-0200','2000-0000','2000-0400','2200-0200','2200-0400','2200-0700','2300-0300','2300-0400' --Stupid parttime shift
 			) THEN 'NS'
-			ELSE Null END AS [Shift_type], ROSTER_RAW.[Work Type]
+			ELSE Null END AS [Shift_type], ROSTER_RAW.[Work Type], ROSTER_RAW.[Site]
 FROM ROSTER_RAW
 LEFT JOIN RAMCO_RAW ON ROSTER_RAW.[Emp ID] = RAMCO_RAW.[EID] AND ROSTER_RAW.[Attribute] = RAMCO_RAW.[Date] 
 ),
@@ -99,7 +119,7 @@ CASE
     WHEN CHARINDEX('-', ROSTER_RAW2.[Original_Shift]) = 5 OR ROSTER_RAW2.[Original_Shift] IN ('UPL', 'PEGA') THEN 7.5 * 3600
     WHEN ROSTER_RAW2.[Original_Shift] IN ('HAL', 'HSL') THEN 3.75 * 3600
     ELSE 0
-END AS [ScheduleSeconds(s)], ROSTER_RAW2.[Work Type]
+END AS [ScheduleSeconds(s)], ROSTER_RAW2.[Work Type], ROSTER_RAW2.[Site]
 FROM ROSTER_RAW2
 FULL JOIN TRANSFER_RAW ON ROSTER_RAW2.[Emp ID] = TRANSFER_RAW.[EID] And ROSTER_RAW2.[Date] = TRANSFER_RAW.[LWD]
 FULL JOIN TERMINATION_RAW ON ROSTER_RAW2.[Emp ID] = TERMINATION_RAW.[EMPLOYEE_ID] And ROSTER_RAW2.[Date] = TERMINATION_RAW.[LWD]
@@ -142,6 +162,7 @@ SELECT
 /*30*/ ROSTER_RAW3.[Termination/Transfer], 
 /*31*/ ROSTER_RAW3.[LOB Group], 
 /*32*/ ROSTER_RAW3.[ScheduleSeconds(s)], 
-/*33*/ ROSTER_RAW3.[Work Type]
+/*33*/ ROSTER_RAW3.[Work Type],
+/*34*/ ROSTER_RAW3.[Site]
 FROM ROSTER_RAW3
 ORDER BY ROSTER_RAW3.[Emp ID], ROSTER_RAW3.[Date] DESC;

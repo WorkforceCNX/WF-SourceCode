@@ -226,6 +226,34 @@ Select cast([Date] as varchar)+[TED Name]+[Seat No] as [Concat], COUNT(*) as [Co
 From BCOM.SEAT
 Where cast([Date] as varchar)+[TED Name]+[Seat No] is not Null
 Group by cast([Date] as varchar)+[TED Name]+[Seat No] Having COUNT(*)>1
+),
+-- 34. BCOM.JKT_ROSTER
+JKT_Roster_Raw as (
+Select [Emp ID]+cast([Attribute] as varchar) as [Concat], COUNT(*) as [Count]
+From BCOM.JKT_ROSTER
+Where [Emp ID]+cast([Attribute] as varchar) is not Null
+Group by [Emp ID]+cast([Attribute] as varchar) Having COUNT(*)>1
+),
+-- 35. BCOM.JKT_Staff
+JKT_TEDNAME as (
+Select [TED Name], COUNT(*) as [Count]
+From BCOM.JKT_Staff
+Where [TED Name] is not null
+Group by [TED Name] Having COUNT(*)>1
+),
+-- 36. BCOM.Schedule
+Schedule_Raw as (
+Select [Emp ID]+cast([Date] as varchar) as [Concat], COUNT(*) as [Count]
+From BCOM.Schedule
+Where [Emp ID]+cast([Date] as varchar) is not Null
+Group by [Emp ID]+cast([Date] as varchar) Having COUNT(*)>1
+),
+-- 37. BCOM.EEAAO
+EEAAO_Raw as (
+Select [Emp ID]+cast([Date] as varchar) as [Concat], COUNT(*) as [Count]
+From BCOM.EEAAO
+Where [Emp ID]+cast([Date] as varchar) is not Null
+Group by [Emp ID]+cast([Date] as varchar) Having COUNT(*)>1
 )
 ------------------------[CheckDup]Process------------------------
 
@@ -360,3 +388,19 @@ UNION ALL
 ------[📥]--SEAT
 Select '33' as [No.], Count(*) as [CheckDup], 'SEAT' as [Table], '' as [Note]
 From SEAT
+UNION ALL
+------[📥]--JKT_Roster_Raw
+Select '34' as [No.], Count(*) as [CheckDup], 'JKT_Roster Raw' as [Table], 'IMPORTANT' as [Note]
+From JKT_Roster_Raw 
+UNION ALL
+------[📥]--JKT_TED Name
+Select '35' as [No.], Count(*) as [CheckDup], 'JKT_TEDNAME' as [Table], 'IMPORTANT' as [Note]
+From JKT_TEDNAME 
+UNION ALL
+------[📥]--Schedule
+Select '36' as [No.], Count(*) as [CheckDup], 'Schedule' as [Table], 'IMPORTANT' as [Note]
+From Schedule_Raw
+UNION ALL
+------[📥]--EEAAO
+Select '37' as [No.], Count(*) as [CheckDup], 'EEAAO' as [Table], 'IMPORTANT' as [Note]
+From EEAAO_Raw

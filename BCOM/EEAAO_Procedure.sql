@@ -76,7 +76,7 @@ BEGIN
 	PremHday_RAW AS ( SELECT [Date],[Holiday] FROM GLB.PremHdays 
 	),
 	-- Create BCOM.SCHEDULE
-	ROSTER_RAW AS ( SELECT [Shift], [Shift_type], [Original_Shift], [LOB], [week_shift], [week_off], [TL_ID], [TL_Name], [OM_ID], [OM_Name], [DPE_ID], [DPE_Name], 
+	ROSTER_RAW AS ( SELECT [Shift], [Shift_type], [Original_Shift], [LOB], [week_shift], [week_off], [TL_ID], [TL_Name], [OM_ID], [OM_Name], [DPE_ID], [DPE_Name], [Site],
 						   [Emp ID], [Emp_Name], [Wave], [Booking Login ID], [TED Name], [cnx_email], [Booking Email], [CUIC Name], [PST_Start_Date], [Date], [Tenure], 
 						   [Tenure days], [Week_num], [Shift_definition], [YEAR], [MONTH], [Week_day], [Termination/Transfer], [LOB Group], [ScheduleSeconds(s)], [Work Type] 
 					FROM BCOM.Schedule WHERE [Date] >= '2024-01-01'
@@ -113,11 +113,25 @@ BEGIN
 	-- Create BCOM.Staff 1 (RAW)
 	Staff_RAW AS ( 
 	SELECT [Employee_ID], [Wave #], [Role], [Booking Login ID], [Language Start Date], [TED Name], [CUIC Name], [EnterpriseName], [Hire_Date], [PST_Start_Date], [Production_Start_Date], [Designation], [cnx_email], [Booking Email], [Full name], [IEX], [serial_number], [BKN_ID], [Extension Number] FROM BCOM.Staff 
+	UniON ALL
+	SELECT [Employee_ID], [Wave #], [Role], [Booking Login ID], [Language Start Date], [TED Name], [CUIC Name], [EnterpriseName], [Hire_Date], [PST_Start_Date], [Production_Start_Date], [Designation], [cnx_email], [Booking Email], [Full name], [IEX], [serial_number], [BKN_ID], [Extension Number] FROM BCOM.JKT_Staff
 	),
 	-- Create TL,OM,DPE 1 (RAW)
-	TL_RAW AS (SELECT [Employee_ID],[TED Name] AS [TL_Name] FROM BCOM.Staff),
-	OM_RAW AS (SELECT [Employee_ID],[TED Name] AS [OM_Name] FROM BCOM.Staff),
-	DPE_RAW AS (SELECT [Employee_ID],[TED Name] AS [DPE_Name] FROM BCOM.Staff),
+	TL_RAW AS (
+	SELECT [Employee_ID],[TED Name] AS [TL_Name] FROM BCOM.Staff
+	UniON ALL
+	SELECT [Employee_ID],[TED Name] AS [TL_Name] FROM BCOM.JKT_Staff
+	),
+	OM_RAW AS (
+	SELECT [Employee_ID],[TED Name] AS [OM_Name] FROM BCOM.Staff
+	UniON ALL
+	SELECT [Employee_ID],[TED Name] AS [OM_Name] FROM BCOM.JKT_Staff
+	),
+	DPE_RAW AS (
+	SELECT [Employee_ID],[TED Name] AS [DPE_Name] FROM BCOM.Staff
+	UniON ALL
+	SELECT [Employee_ID],[TED Name] AS [DPE_Name] FROM BCOM.JKT_Staff
+	),
 	-- Create BCOM.CPI_PEGA 1 (RAW)
 	CPI_PEGA_RAW AS ( 
 	SELECT 
@@ -942,7 +956,8 @@ BEGIN
 	-- Setup [SchedLeave(H)]
 	CASE WHEN ROSTER_RAW.[Shift] IN ('AL','UPL','CO','VGH') THEN 7.50 WHEN ROSTER_RAW.[Shift] IN ('HAL','HSL') THEN 3.75 ELSE 0 END AS [SchedLeave(H)],
 	-- Setup [SchedUPL(H)]
-	CASE WHEN ROSTER_RAW.[Shift] IN ('UPL') THEN 7.50 WHEN ROSTER_RAW.[Shift] IN ('HSL') THEN 3.75 ELSE 0 END AS [SchedUPL(H)]
+	CASE WHEN ROSTER_RAW.[Shift] IN ('UPL') THEN 7.50 WHEN ROSTER_RAW.[Shift] IN ('HSL') THEN 3.75 ELSE 0 END AS [SchedUPL(H)],
+	ROSTER_RAW.[Site]
 	FROM ROSTER_RAW
 	LEFT JOIN PremHday_RAW ON PremHday_RAW.[Date] = ROSTER_RAW.[Date]
 	LEFT JOIN RAMCO_RAW ON RAMCO_RAW.[EID] = ROSTER_RAW.[Emp ID] AND RAMCO_RAW.[Date] = ROSTER_RAW.[Date]
@@ -1237,10 +1252,10 @@ BEGIN
 	/*264 - ROSTER_RAW*/ EEAAO_RAW.[IO_Standard(H)],
 	/*265 - ROSTER_RAW*/ EEAAO_RAW.[IO_Standard_ExcluBreak(H)],
 	/*266 - ROSTER_RAW*/ EEAAO_RAW.[SchedLeave(H)],
-	/*267 - ROSTER_RAW*/ EEAAO_RAW.[SchedUPL(H)]
+	/*267 - ROSTER_RAW*/ EEAAO_RAW.[SchedUPL(H)],
+	/*268 - ROSTER_RAW*/ EEAAO_RAW.[Site]
 	FROM EEAAO_RAW
 	)
-
 /*                                                           
 ----------------------------------------------------------------------------------------------------------------------------------
 --                                           ^                             ^                                                    --
@@ -1300,7 +1315,7 @@ BEGIN
 		[Hold (phone) tar], [AACW (phone) tar], [Avg Talk Time tar], [Phone CSAT tar], [Non phone CSAT tar], [Overall CSAT tar], 
 		[PSAT tar], [PSAT Vietnamese tar], [PSAT English (American) tar], [PSAT English (Great Britain) tar], [CSAT Reso tar],
 		[Quality - personalization tar], [Quality - proactivity tar], [Quality - resolution tar],
-		[ScheduleHours(H)], [IO_Standard(H)], [IO_Standard_ExcluBreak(H)], [SchedLeave(H)], [SchedUPL(H)]
+		[ScheduleHours(H)], [IO_Standard(H)], [IO_Standard_ExcluBreak(H)], [SchedLeave(H)], [SchedUPL(H)], [Site]
     )
     SELECT  -- Get Data from final CTE (EEAAO_RAW2)
         [YEAR], [MONTH], [Date], [Week_num], [Week_day], [DPE_ID], [DPE_Name], [OM_ID], [OM_Name], 
@@ -1354,7 +1369,7 @@ BEGIN
 		[Hold (phone) tar], [AACW (phone) tar], [Avg Talk Time tar], [Phone CSAT tar], [Non phone CSAT tar], [Overall CSAT tar], 
 		[PSAT tar], [PSAT Vietnamese tar], [PSAT English (American) tar], [PSAT English (Great Britain) tar], [CSAT Reso tar],
 		[Quality - personalization tar], [Quality - proactivity tar], [Quality - resolution tar],
-		[ScheduleHours(H)], [IO_Standard(H)], [IO_Standard_ExcluBreak(H)], [SchedLeave(H)], [SchedUPL(H)]
+		[ScheduleHours(H)], [IO_Standard(H)], [IO_Standard_ExcluBreak(H)], [SchedLeave(H)], [SchedUPL(H)], [Site]
     FROM EEAAO_RAW2; 
     RAISERROR('Data insertion into BCOM.EEAAO completed.', 0, 1) WITH NOWAIT;
     PRINT 'Fetching top 5 rows from BCOM.EEAAO as sample data...';
