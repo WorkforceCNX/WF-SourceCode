@@ -211,11 +211,13 @@ MONTH(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RE
 DATENAME(weekday, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) AS [Week_day],
 COALESCE(TRANSFER_RAW.[Remarks], TERMINATION_RAW.[Termination Reason], RESIGNATION_RAW.[Resignation Primary Reason]) AS [Termination/Transfer],
 CASE 
-    WHEN ROSTER_RAW2.[LOB] IN ('NL', 'ID4', 'HE4', 'XT4', 'EL', 'TR', 'KO', 'IT', 'CS', 'HU', 'FR', 'ZH', 'RU', 'PL', 'PT', 'NO', 'DA', 'DE', 'RO', 'BG', 'VI TRA') THEN 'Unbabel'
-    WHEN ROSTER_RAW2.[LOB] IN ('FR CSP', 'ES CSP', 'IT CSP', 'DE CSP') THEN 'Unbabel CSP'
-	WHEN ROSTER_RAW2.[LOB] = 'EN' THEN 'English'
+    WHEN ROSTER_RAW2.[LOB] IN ('NL', 'ID4', 'HE4', 'XT4', 'EL', 'TR', 'KO', 'IT', 'CS', 'HU', 'FR', 'ZH', 'RU', 'PL', 'PT', 'NO', 'DA', 'DE', 'RO', 'BG', 'VI TRA', 'ES', 'SV') THEN 'Unbabel'
+	WHEN ROSTER_RAW2.[LOB] IN ('FR CSP', 'ES CSP', 'IT CSP', 'DE CSP', 'VI TRA CSP', 'ZH CSP', 'PT CSP', 'NO CSP', 'HR CSP') THEN 'Unbabel CSP'
+    WHEN ROSTER_RAW2.[LOB] IN ('ENCSP', 'EN CSP') THEN 'English CSP'
+    WHEN ROSTER_RAW2.[LOB] = 'EN' THEN 'English'
     WHEN ROSTER_RAW2.[LOB] = 'VICSP' THEN 'Vietnamese CSP'
     WHEN ROSTER_RAW2.[LOB] = 'VICSG' THEN 'Vietnamese CSG'
+	WHEN ROSTER_RAW2.[LOB] = 'GATO' THEN 'GATO'
     WHEN ROSTER_RAW2.[LOB] = 'Senior VICSP' THEN 'Senior VICSP'
     ELSE 'Undefined' END AS [LOB Group],
 -- Set up ScheduleSeconds(s)
@@ -672,6 +674,18 @@ ELSE 0 END AS [Psat Score(EN)],
 /*Set up Psat_survey(EN)*/
 CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' AND CSAT_CMB_RAW.[Language] IN ('English (Great Britain)', 'English (American)', 'English-American') THEN 1
 ELSE 0 END AS [Psat Survey(EN)],
+/*Set up Psat_Score(EN Phone)*/
+CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' AND CSAT_CMB_RAW.[Channel] = 'phone' AND CSAT_CMB_RAW.[Language] IN ('English (Great Britain)', 'English (American)', 'English-American') THEN 1
+ELSE 0 END AS [Psat Score(EN Phone)],
+/*Set up Psat_survey(EN Phone)*/
+CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' AND CSAT_CMB_RAW.[Channel] = 'phone' AND CSAT_CMB_RAW.[Language] IN ('English (Great Britain)', 'English (American)', 'English-American') THEN 1
+ELSE 0 END AS [Psat Survey(EN Phone)],
+/*Set up Psat_Score(EN NonPhone)*/
+CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' AND CSAT_CMB_RAW.[Channel] <> 'phone' AND CSAT_CMB_RAW.[Language] IN ('English (Great Britain)', 'English (American)', 'English-American') THEN 1
+ELSE 0 END AS [Psat Score(EN NonPhone)],
+/*Set up Psat_survey(EN NonPhone)*/
+CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' AND CSAT_CMB_RAW.[Channel] <> 'phone' AND CSAT_CMB_RAW.[Language] IN ('English (Great Britain)', 'English (American)', 'English-American') THEN 1
+ELSE 0 END AS [Psat Survey(EN NonPhone)],
 COALESCE(Target_LOB_RAW.[Overall CPH tar],                 Target_LOBGROUP_RAW.[Overall CPH tar])                  as [Overall CPH tar],                  -- combine Tar_LOB & Tar_LOBGROUP
 COALESCE(Target_LOB_RAW.[Phone CPH tar],                   Target_LOBGROUP_RAW.[Phone CPH tar])                    as [Phone CPH tar],                    -- combine Tar_LOB & Tar_LOBGROUP
 COALESCE(Target_LOB_RAW.[Non Phone CPH tar],               Target_LOBGROUP_RAW.[Non Phone CPH tar])                as [Non Phone CPH tar],                -- combine Tar_LOB & Tar_LOBGROUP

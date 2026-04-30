@@ -611,6 +611,18 @@ BEGIN
     /*Set up Psat_survey(EN)*/
     SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' AND CSAT_CMB_RAW.[Language] IN ('English (Great Britain)', 'English (American)', 'English-American') THEN 1
     ELSE 0 END) AS [Psat Survey(EN)],
+    /*Set up Psat_Score(EN Phone)*/
+    SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' AND CSAT_CMB_RAW.[Channel] = 'phone' AND CSAT_CMB_RAW.[Language] IN ('English (Great Britain)', 'English (American)', 'English-American') THEN 1
+    ELSE 0 END) AS [Psat Score(EN Phone)],
+    /*Set up Psat_survey(EN Phone)*/
+    SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' AND CSAT_CMB_RAW.[Channel] = 'phone' AND CSAT_CMB_RAW.[Language] IN ('English (Great Britain)', 'English (American)', 'English-American') THEN 1
+    ELSE 0 END) AS [Psat Survey(EN Phone)],
+    /*Set up Psat_Score(EN NonPhone)*/
+    SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' AND CSAT_CMB_RAW.[Channel] <> 'phone' AND CSAT_CMB_RAW.[Language] IN ('English (Great Britain)', 'English (American)', 'English-American') THEN 1
+    ELSE 0 END) AS [Psat Score(EN NonPhone)],
+    /*Set up Psat_survey(EN NonPhone)*/
+    SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Dissatisfied','Very Satisfied','Very Dissatisfied') AND CSAT_CMB_RAW.[CSAT/PSAT] = 'PSAT' AND CSAT_CMB_RAW.[Channel] <> 'phone' AND CSAT_CMB_RAW.[Language] IN ('English (Great Britain)', 'English (American)', 'English-American') THEN 1
+    ELSE 0 END) AS [Psat Survey(EN NonPhone)],
     /*Set up Csat_Score(VI-CSG Overall)*/
     SUM(CASE WHEN CSAT_CMB_RAW.[Csat 2.0 Score] IN ('Satisfied','Very Satisfied') AND CSAT_CMB_RAW.[Type] <> 'touchpoint' AND CSAT_CMB_RAW.[CSAT/PSAT] = 'CSAT' 
     THEN (CASE WHEN ROSTER_RAW.[LOB] = 'VICSG' THEN 1 ELSE 0 END) 
@@ -1029,7 +1041,7 @@ BEGIN
     CASE WHEN ROSTER_RAW.[Shift] IN ('UPL') THEN 7.50 WHEN ROSTER_RAW.[Shift] IN ('HSL') THEN 3.75 ELSE 0 END AS [SchedUPL(H)],
     ROSTER_RAW.[Site], CSAT_CMB_RAW2.[Csat Score(VI-CSG Phone)], CSAT_CMB_RAW2.[Csat Survey(VI-CSG Phone)], CSAT_CMB_RAW2.[Csat Score(VI-CSG NonPhone)], CSAT_CMB_RAW2.[Csat Survey(VI-CSG NonPhone)], 
     CSAT_CMB_RAW2.[Psat_survey_VIPhone], CSAT_CMB_RAW2.[Psat_Score_VIPhone], CSAT_CMB_RAW2.[Psat_survey_VINonPhone], CSAT_CMB_RAW2.[Psat_Score_VINonPhone], CSAT_CMB_RAW2.[Psat_survey(UB)], CSAT_CMB_RAW2.[Psat_Score(UB)], 
-    CSAT_CMB_RAW2.[Psat Score(EN)], CSAT_CMB_RAW2.[Psat Survey(EN)]
+    CSAT_CMB_RAW2.[Psat Score(EN)], CSAT_CMB_RAW2.[Psat Survey(EN)], CSAT_CMB_RAW2.[Psat Score(EN Phone)], CSAT_CMB_RAW2.[Psat Survey(EN Phone)], CSAT_CMB_RAW2.[Psat Score(EN NonPhone)], CSAT_CMB_RAW2.[Psat Survey(EN NonPhone)]
     FROM ROSTER_RAW
     LEFT JOIN PremHday_RAW ON PremHday_RAW.[Date] = ROSTER_RAW.[Date]
     LEFT JOIN RAMCO_RAW ON RAMCO_RAW.[EID] = ROSTER_RAW.[Emp ID] AND RAMCO_RAW.[Date] = ROSTER_RAW.[Date]
@@ -1337,7 +1349,11 @@ BEGIN
     /*277 - CSAT_CMB_RAW2*/ EEAAO_RAW.[Psat_survey(UB)], 
     /*278 - CSAT_CMB_RAW2*/ EEAAO_RAW.[Psat_Score(UB)], 
     /*279 - CSAT_CMB_RAW2*/ EEAAO_RAW.[Psat Score(EN)], 
-    /*280 - CSAT_CMB_RAW2*/ EEAAO_RAW.[Psat Survey(EN)]
+    /*280 - CSAT_CMB_RAW2*/ EEAAO_RAW.[Psat Survey(EN)],
+    /*281 - CSAT_CMB_RAW2*/ EEAAO_RAW.[Psat Score(EN Phone)],
+    /*282 - CSAT_CMB_RAW2*/ EEAAO_RAW.[Psat Survey(EN Phone)],
+    /*283 - CSAT_CMB_RAW2*/ EEAAO_RAW.[Psat Score(EN NonPhone)],
+    /*284 - CSAT_CMB_RAW2*/ EEAAO_RAW.[Psat Survey(EN NonPhone)]
     FROM EEAAO_RAW
     )
 
@@ -1403,7 +1419,7 @@ BEGIN
 		[ScheduleHours(H)], [IO_Standard(H)], [IO_Standard_ExcluBreak(H)], [SchedLeave(H)], [SchedUPL(H)], [Site], 
         [Csat Score(VI-CSG Phone)], [Csat Survey(VI-CSG Phone)], [Csat Score(VI-CSG NonPhone)], [Csat Survey(VI-CSG NonPhone)], 
         [Psat_survey_VIPhone], [Psat_Score_VIPhone], [Psat_survey_VINonPhone], [Psat_Score_VINonPhone], 
-        [Psat_survey(UB)], [Psat_Score(UB)], [Psat Score(EN)], [Psat Survey(EN)]
+        [Psat_survey(UB)], [Psat_Score(UB)], [Psat Score(EN)], [Psat Survey(EN)], [Psat Score(EN Phone)], [Psat Survey(EN Phone)], [Psat Score(EN NonPhone)], [Psat Survey(EN NonPhone)]
     )
     SELECT  -- Get Data from final CTE (EEAAO_RAW2)
         [YEAR], [MONTH], [Date], [Week_num], [Week_day], [DPE_ID], [DPE_Name], [OM_ID], [OM_Name], 
@@ -1460,7 +1476,7 @@ BEGIN
 		[ScheduleHours(H)], [IO_Standard(H)], [IO_Standard_ExcluBreak(H)], [SchedLeave(H)], [SchedUPL(H)], [Site],
         [Csat Score(VI-CSG Phone)], [Csat Survey(VI-CSG Phone)], [Csat Score(VI-CSG NonPhone)], [Csat Survey(VI-CSG NonPhone)], 
         [Psat_survey_VIPhone], [Psat_Score_VIPhone], [Psat_survey_VINonPhone], [Psat_Score_VINonPhone], 
-        [Psat_survey(UB)], [Psat_Score(UB)], [Psat Score(EN)], [Psat Survey(EN)]
+        [Psat_survey(UB)], [Psat_Score(UB)], [Psat Score(EN)], [Psat Survey(EN)], [Psat Score(EN Phone)], [Psat Survey(EN Phone)], [Psat Score(EN NonPhone)], [Psat Survey(EN NonPhone)]
     FROM EEAAO_RAW2; 
     RAISERROR('Data insertion into BCOM.EEAAO completed.', 0, 1) WITH NOWAIT;
     PRINT 'Fetching top 5 rows from BCOM.EEAAO as sample data...';
@@ -1470,6 +1486,5 @@ BEGIN
     SET NOCOUNT OFF;
 END;
 GO
-
 
 -- EXEC BCOM.Refresh_EEAAO_Data;

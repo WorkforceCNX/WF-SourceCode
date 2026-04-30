@@ -497,7 +497,11 @@ CREATE TABLE BCOM.EEAAO (
 [Psat_survey(UB)] float(53) NULL, 
 [Psat_Score(UB)] float(53) NULL, 
 [Psat Score(EN)] float(53) NULL, 
-[Psat Survey(EN)] float(53) NULL
+[Psat Survey(EN)] float(53) NULL,
+[Psat Score(EN Phone)] float(53) NULL, 
+[Psat Survey(EN Phone)] float(53) NULL, 
+[Psat Score(EN NonPhone)] float(53) NULL, 
+[Psat Survey(EN NonPhone)] float(53) NULL
 );
 
 Select Top 10 * From BCOM.EEAAO
