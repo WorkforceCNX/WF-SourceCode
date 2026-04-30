@@ -107,11 +107,13 @@ MONTH(COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RE
 DATENAME(weekday, COALESCE(ROSTER_RAW2.[Date], TRANSFER_RAW.[LWD], TERMINATION_RAW.[LWD], RESIGNATION_RAW.[Proposed Termination Date])) AS [Week_day],
 COALESCE(TRANSFER_RAW.[Remarks], TERMINATION_RAW.[Termination Reason], RESIGNATION_RAW.[Resignation Primary Reason]) AS [Termination/Transfer],
 CASE 
-    WHEN ROSTER_RAW2.[LOB] IN ('NL', 'ID4', 'HE4', 'XT4', 'EL', 'TR', 'KO', 'IT', 'CS', 'HU', 'FR', 'ZH', 'RU', 'PL', 'PT', 'NO', 'DA', 'DE', 'RO', 'BG', 'VI TRA') THEN 'Unbabel'
-	WHEN ROSTER_RAW2.[LOB] IN ('FR CSP', 'ES CSP', 'IT CSP', 'DE CSP') THEN 'Unbabel CSP'
+    WHEN ROSTER_RAW2.[LOB] IN ('NL', 'ID4', 'HE4', 'XT4', 'EL', 'TR', 'KO', 'IT', 'CS', 'HU', 'FR', 'ZH', 'RU', 'PL', 'PT', 'NO', 'DA', 'DE', 'RO', 'BG', 'VI TRA', 'ES', 'SV') THEN 'Unbabel'
+	WHEN ROSTER_RAW2.[LOB] IN ('FR CSP', 'ES CSP', 'IT CSP', 'DE CSP', 'VI TRA CSP', 'ZH CSP', 'PT CSP', 'NO CSP', 'HR CSP') THEN 'Unbabel CSP'
+    WHEN ROSTER_RAW2.[LOB] IN ('ENCSP', 'EN CSP') THEN 'English CSP'
     WHEN ROSTER_RAW2.[LOB] = 'EN' THEN 'English'
     WHEN ROSTER_RAW2.[LOB] = 'VICSP' THEN 'Vietnamese CSP'
     WHEN ROSTER_RAW2.[LOB] = 'VICSG' THEN 'Vietnamese CSG'
+	WHEN ROSTER_RAW2.[LOB] = 'GATO' THEN 'GATO'
     WHEN ROSTER_RAW2.[LOB] = 'Senior VICSP' THEN 'Senior VICSP'
     ELSE 'Undefined' END AS [LOB Group],
 -- Set up ScheduleSeconds(s)

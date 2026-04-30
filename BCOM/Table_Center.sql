@@ -484,8 +484,20 @@ CREATE TABLE BCOM.EEAAO (
 [IO_Standard_ExcluBreak(H)] INT NULL,
 [SchedLeave(H)] INT NULL,
 [SchedUPL(H)] INT NULL,
-EEAAO_ID INT IDENTITY(1,1) PRIMARY KEY,
-[Site] VARCHAR(50) NULL
+[EEAAO_ID] INT IDENTITY(1,1) PRIMARY KEY,
+[Site] VARCHAR(50) NULL,
+[Csat Score(VI-CSG Phone)] float(53) NULL, 
+[Csat Survey(VI-CSG Phone)] float(53) NULL, 
+[Csat Score(VI-CSG NonPhone)] float(53) NULL, 
+[Csat Survey(VI-CSG NonPhone)] float(53) NULL, 
+[Psat_survey_VIPhone] float(53) NULL, 
+[Psat_Score_VIPhone] float(53) NULL, 
+[Psat_survey_VINonPhone] float(53) NULL, 
+[Psat_Score_VINonPhone] float(53) NULL, 
+[Psat_survey(UB)] float(53) NULL, 
+[Psat_Score(UB)] float(53) NULL, 
+[Psat Score(EN)] float(53) NULL, 
+[Psat Survey(EN)] float(53) NULL
 );
 
 Select Top 10 * From BCOM.EEAAO
