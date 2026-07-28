@@ -241,14 +241,26 @@ From BCOM.JKT_Staff
 Where [TED Name] is not null
 Group by [TED Name] Having COUNT(*)>1
 ),
--- 36. BCOM.Schedule
+Staff_RAW AS ( 
+SELECT [Employee_ID], [Wave #], [Role], [Booking Login ID], [Language Start Date], [TED Name], [CUIC Name], [EnterpriseName], [Hire_Date], [PST_Start_Date], [Production_Start_Date], [Designation], [cnx_email], [Booking Email], [Full name], [IEX], [serial_number], [BKN_ID], [Extension Number] FROM BCOM.Staff
+Union All
+SELECT [Employee_ID], [Wave #], [Role], [Booking Login ID], [Language Start Date], [TED Name], [CUIC Name], [EnterpriseName], [Hire_Date], [PST_Start_Date], [Production_Start_Date], [Designation], [cnx_email], [Booking Email], [Full name], [IEX], [serial_number], [BKN_ID], [Extension Number] FROM BCOM.JKT_Staff
+),
+-- 36. BCOM.CMB_Staff
+CMB_EID as (
+Select [Employee_ID], COUNT(*) as [Count]
+From Staff_RAW
+Where [Employee_ID] is not null
+Group by [Employee_ID] Having COUNT(*)>1
+),
+-- 37. BCOM.Schedule
 Schedule_Raw as (
 Select [Emp ID]+cast([Date] as varchar) as [Concat], COUNT(*) as [Count]
 From BCOM.Schedule
 Where [Emp ID]+cast([Date] as varchar) is not Null
 Group by [Emp ID]+cast([Date] as varchar) Having COUNT(*)>1
 ),
--- 37. BCOM.EEAAO
+-- 38. BCOM.EEAAO
 EEAAO_Raw as (
 Select [Emp ID]+cast([Date] as varchar) as [Concat], COUNT(*) as [Count]
 From BCOM.EEAAO
@@ -397,10 +409,14 @@ UNION ALL
 Select '35' as [No.], Count(*) as [CheckDup], 'JKT_TEDNAME' as [Table], 'IMPORTANT' as [Note]
 From JKT_TEDNAME 
 UNION ALL
+------[📥]--CMB_EID Name
+Select '36' as [No.], Count(*) as [CheckDup], 'CMB_EID' as [Table], 'IMPORTANT' as [Note]
+From CMB_EID 
+UNION ALL
 ------[📥]--Schedule
-Select '36' as [No.], Count(*) as [CheckDup], 'Schedule' as [Table], 'IMPORTANT' as [Note]
+Select '37' as [No.], Count(*) as [CheckDup], 'Schedule' as [Table], 'IMPORTANT' as [Note]
 From Schedule_Raw
 UNION ALL
 ------[📥]--EEAAO
-Select '37' as [No.], Count(*) as [CheckDup], 'EEAAO' as [Table], 'IMPORTANT' as [Note]
+Select '38' as [No.], Count(*) as [CheckDup], 'EEAAO' as [Table], 'IMPORTANT' as [Note]
 From EEAAO_Raw

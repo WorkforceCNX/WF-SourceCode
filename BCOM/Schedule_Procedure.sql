@@ -123,7 +123,7 @@ BEGIN
 	COALESCE(TRANSFER_RAW.[Remarks], TERMINATION_RAW.[Termination Reason], RESIGNATION_RAW.[Resignation Primary Reason]) AS [Termination/Transfer],
 	CASE 
 		WHEN ROSTER_RAW2.[LOB] IN ('NL', 'ID4', 'HE4', 'XT4', 'EL', 'TR', 'KO', 'IT', 'CS', 'HU', 'FR', 'ZH', 'RU', 'PL', 'PT', 'NO', 'DA', 'DE', 'RO', 'BG', 'VI TRA', 'ES', 'SV') THEN 'Unbabel'
-		WHEN ROSTER_RAW2.[LOB] IN ('FR CSP', 'ES CSP', 'IT CSP', 'DE CSP', 'VI TRA CSP', 'ZH CSP', 'PT CSP', 'NO CSP', 'HR CSP') THEN 'Unbabel CSP'
+		WHEN ROSTER_RAW2.[LOB] IN ('FR CSP', 'ES CSP', 'IT CSP', 'DE CSP', 'VI TRA CSP', 'ZH CSP', 'PT CSP', 'NO CSP', 'HR CSP', 'EL CSP', 'PL CSP') THEN 'Unbabel CSP'
 		WHEN ROSTER_RAW2.[LOB] IN ('ENCSP', 'EN CSP') THEN 'English CSP'
 		WHEN ROSTER_RAW2.[LOB] = 'EN' THEN 'English'
 		WHEN ROSTER_RAW2.[LOB] = 'VICSP' THEN 'Vietnamese CSP'
